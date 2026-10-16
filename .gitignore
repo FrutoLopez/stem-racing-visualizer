@@ -1,0 +1,13 @@
+.venv
+venv
+__pycache__/
+*.pyc
+.DS_Store
+Mockups.pptx
+Racing Score Calculator.xlsx
+design_backup_v1/
+design_backup_v2/
+~$Mockups.pptx
+scratch_pdf.py
+scratch_pdf_clean.py
+~$Mockups.pptx

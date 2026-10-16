@@ -1,0 +1,11 @@
+team,race_number,reaction_time,race_time,total_time,is_dnf,is_false_start
+ITDB,1,0.0,,,False,True
+St. George,1,0.0,,,True,False
+ITDB,3,0.004,0.001,0.005,False,False
+St. George,3,0.002,0.001,0.003,False,False
+Oxford,3,0.001,0.001,0.002,False,False
+Isaac Rabin,3,0.001,0.001,0.002,False,False
+ITDB,4,0.001,0.001,0.002,False,False
+St. George,4,0.001,0.001,0.002,False,False
+ITDB,2,1.0,1.0,2.0,False,False
+St. George,2,2.0,1.0,3.0,False,False

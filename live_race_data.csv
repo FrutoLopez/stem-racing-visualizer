@@ -1,0 +1,33 @@
+id,timestamp,team,race_number,reaction_time,race_time,total_time,is_dnf,is_false_start
+1,2026-10-16 13:33:41,ITDB,1,0.198,1.333,1.531,False,False
+2,2026-10-16 13:33:41,St. George,1,0.207,1.58,1.787,False,False
+3,2026-10-16 13:33:48,ITDB,2,0.229,1.428,1.657,False,False
+4,2026-10-16 13:33:48,St. George,2,0.262,1.238,1.5,False,False
+5,2026-10-16 13:33:57,ITDB,3,0.249,1.646,1.895,False,False
+6,2026-10-16 13:33:57,St. George,3,0.173,1.651,1.824,False,False
+7,2026-10-16 13:34:03,ITDB,4,0.0,,,False,True
+8,2026-10-16 13:34:03,St. George,4,0.0,,,True,False
+9,2026-10-16 13:34:27,Oxford,4,0.0,,,False,True
+10,2026-10-16 13:34:27,Isaac Rabin,4,0.271,1.717,1.988,False,False
+11,2026-10-16 13:34:35,Oxford,1,0.26,1.748,2.008,False,False
+12,2026-10-16 13:34:35,Isaac Rabin,1,0.168,1.431,1.599,False,False
+13,2026-10-16 13:34:40,Oxford,2,0.129,1.297,1.426,False,False
+14,2026-10-16 13:34:40,Isaac Rabin,2,0.138,1.336,1.474,False,False
+15,2026-10-16 13:34:45,Oxford,3,0.0,,,True,False
+16,2026-10-16 13:34:45,Isaac Rabin,3,0.0,,,True,False
+17,2026-10-16 13:37:01,Panamerican,1,0.147,1.696,1.843,False,False
+18,2026-10-16 13:37:01,Sun Yat Sen,1,0.147,1.637,1.784,False,False
+19,2026-10-16 13:37:09,Panamerican,2,0.248,1.701,1.949,False,False
+20,2026-10-16 13:37:09,Sun Yat Sen,2,0.102,1.544,1.646,False,False
+21,2026-10-16 13:37:14,Panamerican,3,0.23,1.56,1.79,False,False
+22,2026-10-16 13:37:14,Sun Yat Sen,3,0.0,,,False,True
+23,2026-10-16 13:37:25,Panamerican,4,0.0,,,True,False
+24,2026-10-16 13:37:25,Sun Yat Sen,4,0.0,,,True,False
+25,2026-10-16 13:38:10,Brader,4,0.142,1.355,1.497,False,False
+26,2026-10-16 13:38:10,TJS,4,0.0,,,False,True
+27,2026-10-16 13:38:15,Brader,3,0.237,1.583,1.82,False,False
+28,2026-10-16 13:38:15,TJS,3,0.223,1.25,1.473,False,False
+29,2026-10-16 13:38:19,Brader,2,0.0,,,False,True
+30,2026-10-16 13:38:19,TJS,2,0.286,1.474,1.76,False,False
+31,2026-10-16 13:38:22,Brader,1,0.263,1.238,1.501,False,False
+32,2026-10-16 13:38:22,TJS,1,0.0,,,True,False
