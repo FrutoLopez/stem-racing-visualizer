@@ -555,3 +555,54 @@ def render_app_header(logo_b64: str = "") -> str:
     <div class="sr-header-tag">#STEMRacing</div>
 </div>"""
     return html
+
+
+TEAM_LOGO_FILES = {
+    "BoscoTech": "logo_boscotech.png",
+    "JAF Racing Team": "logo_jaf_racing_team.png",
+    "Excalibur": "logo_excalibur.png",
+    "Rayo Rabin": "logo_rayo_rabin.png",
+    "Hayai Aerodynamics": "logo_hayai_aerodynamics.png",
+    "Dim3nsion": "logo_dim3nsion.png",
+    "Raiders": "logo_raiders.png",
+    "Cybercolts Racing": "logo_cybercolts_racing.png",
+    "PNTHR": "logo_pnthr.png",
+}
+
+
+def load_team_logos_b64(assets_dir: str) -> dict:
+    """Load base64-encoded PNG logos for all teams that have an extracted logo in assets."""
+    logos = {}
+    for team_name, filename in TEAM_LOGO_FILES.items():
+        path = os.path.join(assets_dir, filename)
+        b64 = get_base64_encoded_image(path)
+        if b64:
+            logos[team_name] = b64
+    return logos
+
+
+def get_team_logo_html(team_name: str, logos_b64: dict, height: int = 30, fallback_emoji: str = "🏎️") -> str:
+    """Return an inline HTML badge with fixed uniform dimensions (220:150 aspect ratio) for homogeneous display."""
+    width = int(round(height * (220.0 / 150.0)))
+    b64 = logos_b64.get(str(team_name).strip(), "") if logos_b64 else ""
+    if b64:
+        return (
+            f'<img src="data:image/png;base64,{b64}" alt="{team_name}" '
+            f'style="width:{width}px; height:{height}px; object-fit:cover; '
+            f'border-radius:6px; border:1px solid rgba(255,255,255,0.22); '
+            f'vertical-align:middle; box-shadow:0 2px 8px rgba(0,0,0,0.45); flex-shrink:0; display:inline-block;" />'
+        )
+    return (
+        f'<span style="width:{width}px; height:{height}px; border-radius:6px; '
+        f'background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.22); '
+        f'display:inline-flex; align-items:center; justify-content:center; '
+        f'font-size:{max(13, int(height*0.58))}px; vertical-align:middle; line-height:1; '
+        f'box-shadow:0 2px 8px rgba(0,0,0,0.45); flex-shrink:0;">{fallback_emoji}</span>'
+    )
+
+
+def render_team_with_logo(team_name: str, logos_b64: dict, height: int = 30, gap: int = 10) -> str:
+    """Return an inline flex container with the team's uniform logo badge and name."""
+    icon = get_team_logo_html(team_name, logos_b64, height=height)
+    return f'<span style="display:inline-flex; align-items:center; gap:{gap}px; vertical-align:middle;">{icon}<span>{team_name}</span></span>'
+

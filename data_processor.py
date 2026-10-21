@@ -22,17 +22,30 @@ DEFAULT_CATEGORIES = [
 ]
 
 DEFAULT_TEAMS = [
-    "ITDB",
-    "St. George",
-    "Oxford",
-    "Isaac Rabin",
-    "Panamerican",
-    "Sun Yat Sen",
-    "Brader",
-    "TJS",
-    "Casco",
+    "BoscoTech",
+    "JAF Racing Team",
+    "Excalibur",
+    "Rayo Rabin",
+    "Hayai Aerodynamics",
+    "Dim3nsion",
+    "Raiders",
+    "Cybercolts Racing",
+    "PNTHR",
     "ISP"
 ]
+
+LEGACY_TEAM_MAP = {
+    "ITDB": "BoscoTech",
+    "St. George": "JAF Racing Team",
+    "Oxford": "Excalibur",
+    "Isaac Rabin": "Rayo Rabin",
+    "Panamerican": "Hayai Aerodynamics",
+    "Sun Yat Sen": "Dim3nsion",
+    "Brader": "Raiders",
+    "TJS": "Cybercolts Racing",
+    "Casco": "PNTHR",
+    "ISP": "ISP",
+}
 
 
 def load_teams_from_csv(path: str = "Equipos.csv") -> List[str]:
@@ -157,7 +170,7 @@ def load_runs_from_csv(file_source: Any) -> pd.DataFrame:
         else:
             df['is_false_start'] = df['is_false_start'].astype(str).str.strip().str.lower().isin(['true', '1', 'yes', 'si', 'fs', 'false start'])
 
-        df['team'] = df['team'].astype(str).str.strip()
+        df['team'] = df['team'].astype(str).str.strip().replace(LEGACY_TEAM_MAP)
         df = df[df['team'] != ''].reset_index(drop=True)
 
         # Clean numeric fields

@@ -15,8 +15,11 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
+import importlib
 import data_processor as dp
 import styles
+importlib.reload(dp)
+importlib.reload(styles)
 
 # Page Configuration
 st.set_page_config(
@@ -58,6 +61,18 @@ TEAMS_CSV_PATH = os.path.join(os.path.dirname(__file__), "Equipos.csv")
 LIVE_CSV_PATH = os.path.join(os.path.dirname(__file__), "live_race_data.csv")
 
 logo_b64 = styles.get_base64_encoded_image(LOGO_PATH)
+team_logos_b64 = styles.load_team_logos_b64(ASSETS_DIR)
+
+
+def team_badge(team_name: str, height: int = 28, gap: int = 9) -> str:
+    """Render team logo + team name inline."""
+    return styles.render_team_with_logo(team_name, team_logos_b64, height=height, gap=gap)
+
+
+def team_logo_only(team_name: str, height: int = 34, fallback_emoji: str = "🏎️") -> str:
+    """Render only the team logo (or fallback emoji if team has no logo)."""
+    return styles.get_team_logo_html(team_name, team_logos_b64, height=height, fallback_emoji=fallback_emoji)
+
 
 # Load official teams and matchups
 official_teams = dp.load_teams_from_csv(TEAMS_CSV_PATH)
@@ -79,7 +94,7 @@ def normalize_runs_df(df: pd.DataFrame) -> pd.DataFrame:
     for col in RUNS_SCHEMA:
         if col not in cleaned.columns:
             cleaned[col] = False if col in ('is_dnf', 'is_false_start') else (0.0 if 'time' in col else '')
-    cleaned['team'] = cleaned['team'].astype(str).str.strip()
+    cleaned['team'] = cleaned['team'].astype(str).str.strip().replace(dp.LEGACY_TEAM_MAP)
     cleaned = cleaned[cleaned['team'] != '']
     cleaned['race_number'] = pd.to_numeric(cleaned['race_number'], errors='coerce').fillna(1).astype(int)
     cleaned['reaction_time'] = pd.to_numeric(cleaned['reaction_time'], errors='coerce').fillna(0.0).astype(float)
@@ -132,6 +147,12 @@ def get_shared_race_store():
 shared_store = get_shared_race_store()
 if "history_df" not in shared_store or shared_store["history_df"] is None:
     shared_store["history_df"] = dp.load_runs_from_csv(LIVE_CSV_PATH)
+elif not shared_store["history_df"].empty and "team" in shared_store["history_df"].columns:
+    if shared_store["history_df"]["team"].isin(dp.LEGACY_TEAM_MAP.keys()).any():
+        shared_store["history_df"]["team"] = shared_store["history_df"]["team"].replace(dp.LEGACY_TEAM_MAP)
+        dp.save_runs_to_csv(shared_store["history_df"], LIVE_CSV_PATH)
+        shared_store["runs_df"] = normalize_runs_df(shared_store["history_df"])
+        shared_store["version"] += 1
 
 # Check if CSV file was updated externally on disk
 if os.path.exists(LIVE_CSV_PATH):
@@ -453,9 +474,12 @@ def render_place_reveal_slide(rank_target: int, medal_emoji: str, title: str, ac
 
         <!-- Equipo Ganador y Puntaje Total (ARRIBA en puesto protagónico, aparece de ÚLTIMO con suspenso dramático) -->
         <div class="sr-anim-winner" style="display: flex; justify-content: center; align-items: center; gap: 40px; background: rgba(25, 17, 50, 0.92); border: 2px solid {accent_color}; border-radius: 20px; padding: 22px 50px; margin-bottom: 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.65), 0 0 25px {accent_color}55;">
-            <div style="text-align: center;">
-                <div style="font-size: 12px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1.5px;">Equipo Galardonado</div>
-                <div style="font-size: 40px; font-weight: 900; color: #FFFFFF; margin-top: 4px; letter-spacing: 0.5px;">{team_name}</div>
+            <div style="display: flex; align-items: center; gap: 18px;">
+                {team_logo_only(team_name, height=58)}
+                <div style="text-align: left;">
+                    <div style="font-size: 12px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1.5px;">Equipo Galardonado</div>
+                    <div style="font-size: 40px; font-weight: 900; color: #FFFFFF; margin-top: 4px; letter-spacing: 0.5px;">{team_name}</div>
+                </div>
             </div>
             <div style="height: 56px; width: 2px; background: rgba(255,255,255,0.2);"></div>
             <div style="text-align: center;">
@@ -559,7 +583,7 @@ def render_podium_full_slide():
             r_pts = format_pts(r['Total'])
             rows.append(f"""<tr>
                 <td style="padding: 10px 14px; font-weight: 800; font-size: 14px; color: #A09EB8; border-bottom: 1px solid rgba(255, 255, 255, 0.06); text-align: center;">#{r_rank}</td>
-                <td style="padding: 10px 14px; font-weight: 800; font-size: 15px; color: #FFFFFF; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">🏎️ {r_team}</td>
+                <td style="padding: 10px 14px; font-weight: 800; font-size: 15px; color: #FFFFFF; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">{team_badge(r_team, height=24)}</td>
                 <td style="padding: 10px 14px; text-align: right; font-weight: 900; font-size: 16px; color: #00F0FF; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">{r_pts} <span style="font-size: 11px; color: #A09EB8;">PTS</span></td>
             </tr>""")
         if not rows:
@@ -585,8 +609,9 @@ def render_podium_full_slide():
         <div class="sr-podium-container" style="display: flex; justify-content: center; align-items: flex-end; gap: 20px; margin: 15px auto 20px auto; padding: 10px 0; max-width: 850px; width: 100%;">
             <div class="sr-podium-col sr-podium-anim-2" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; max-width: 260px; min-width: 180px;">
                 <div style="text-align: center; margin-bottom: 14px;">
-                    <div style="font-size: 38px;">🥈</div>
-                    <div style="font-size: 19px; font-weight: 900; color: #FFFFFF; text-shadow: 0 2px 8px rgba(0,0,0,0.8); margin-top: 4px;">{t2_name}</div>
+                    <div style="font-size: 34px; margin-bottom: 4px;">🥈</div>
+                    <div style="margin-bottom: 4px;">{team_logo_only(t2_name, height=40)}</div>
+                    <div style="font-size: 18px; font-weight: 900; color: #FFFFFF; text-shadow: 0 2px 8px rgba(0,0,0,0.8); margin-top: 4px;">{t2_name}</div>
                     <div style="font-size: 15px; font-weight: 800; color: #E6E8EB; margin-top: 2px;">{t2_pts} PTS</div>
                 </div>
                 <div class="sr-pedestal sr-pedestal-2" style="width: 100%; height: 180px; border-radius: 16px 16px 0 0; background: linear-gradient(180deg, #E6E8EB 0%, #767B85 100%); color: #0E1217; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 25px rgba(220, 225, 235, 0.4); border-top: 3px solid #FFFFFF; box-sizing: border-box;">
@@ -597,8 +622,9 @@ def render_podium_full_slide():
 
             <div class="sr-podium-col sr-podium-anim-1" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; max-width: 260px; min-width: 180px;">
                 <div style="text-align: center; margin-bottom: 14px;">
-                    <div style="font-size: 48px;">👑</div>
-                    <div style="font-size: 23px; font-weight: 900; color: #FCBC00; text-shadow: 0 2px 10px rgba(252, 188, 0, 0.5); margin-top: 4px;">{t1_name}</div>
+                    <div style="font-size: 42px; margin-bottom: 4px;">👑</div>
+                    <div style="margin-bottom: 4px;">{team_logo_only(t1_name, height=46)}</div>
+                    <div style="font-size: 22px; font-weight: 900; color: #FCBC00; text-shadow: 0 2px 10px rgba(252, 188, 0, 0.5); margin-top: 4px;">{t1_name}</div>
                     <div style="font-size: 17px; font-weight: 900; color: #FCBC00; margin-top: 2px;">{t1_pts} PTS</div>
                 </div>
                 <div class="sr-pedestal sr-pedestal-1" style="width: 100%; height: 240px; border-radius: 16px 16px 0 0; background: linear-gradient(180deg, #FCBC00 0%, #B87C00 100%); color: #150C00; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 14px 40px rgba(0,0,0,0.6), 0 0 35px rgba(252, 188, 0, 0.55); border-top: 3px solid #FFF275; box-sizing: border-box;">
@@ -609,8 +635,9 @@ def render_podium_full_slide():
 
             <div class="sr-podium-col sr-podium-anim-3" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; max-width: 260px; min-width: 180px;">
                 <div style="text-align: center; margin-bottom: 14px;">
-                    <div style="font-size: 38px;">🥉</div>
-                    <div style="font-size: 19px; font-weight: 900; color: #FFFFFF; text-shadow: 0 2px 8px rgba(0,0,0,0.8); margin-top: 4px;">{t3_name}</div>
+                    <div style="font-size: 34px; margin-bottom: 4px;">🥉</div>
+                    <div style="margin-bottom: 4px;">{team_logo_only(t3_name, height=40)}</div>
+                    <div style="font-size: 18px; font-weight: 900; color: #FFFFFF; text-shadow: 0 2px 8px rgba(0,0,0,0.8); margin-top: 4px;">{t3_name}</div>
                     <div style="font-size: 15px; font-weight: 800; color: #ED6D05; margin-top: 2px;">{t3_pts} PTS</div>
                 </div>
                 <div class="sr-pedestal sr-pedestal-3" style="width: 100%; height: 140px; border-radius: 16px 16px 0 0; background: linear-gradient(180deg, #ED6D05 0%, #994400 100%); color: #190B00; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 25px rgba(237, 109, 5, 0.45); border-top: 3px solid #FFBE85; box-sizing: border-box;">
@@ -691,6 +718,8 @@ if selected_view == "📝 Pantalla de Edición y Registro":
 
     # Matchup Selector (Top, Non-typeable Pills)
     matchup_labels = [m['label'] for m in matchups_list]
+    if st.session_state.get("input_matchup_selector") not in matchup_labels:
+        st.session_state["input_matchup_selector"] = matchup_labels[0]
     st.markdown("<div style='font-size: 14px; font-weight: 700; color: #E6E4F0; margin-bottom: 6px;'>⚔️ Seleccionar Enfrentamiento Oficial:</div>", unsafe_allow_html=True)
     selected_matchup_label = st.pills(
         "Seleccionar Enfrentamiento Oficial:",
@@ -699,7 +728,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         key="input_matchup_selector",
         label_visibility="collapsed"
     )
-    if not selected_matchup_label:
+    if not selected_matchup_label or selected_matchup_label not in matchup_labels:
         selected_matchup_label = matchup_labels[0]
 
     selected_matchup = next(m for m in matchups_list if m['label'] == selected_matchup_label)
@@ -859,7 +888,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         col_fa_top, col_fb_top = st.columns(2)
         with col_fa_top:
             status_a_html = '<span style="font-size: 11px; color: #00F0FF; background: rgba(0, 240, 255, 0.12); padding: 2px 8px; border-radius: 6px; font-weight: 700;">✏️ Guardado (sobreescribible)</span>' if already_exists_a else '<span style="font-size: 11px; color: #A09EB8;">⏳ Sin registro</span>'
-            st.markdown(f"<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 18px; font-weight: 900; color: #00F0FF;'>🏎️ {team_a}</span>{status_a_html}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 18px; font-weight: 900; color: #00F0FF;'>{team_badge(team_a, height=28)}</span>{status_a_html}</div>", unsafe_allow_html=True)
             col_chk_a1, col_chk_a2 = st.columns(2)
             with col_chk_a1:
                 a_dnf = st.checkbox("❌ DNF", key=chk_dnf_a_key, on_change=_on_toggle_dnf_a)
@@ -868,7 +897,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
 
         with col_fb_top:
             status_b_html = '<span style="font-size: 11px; color: #FF8A00; background: rgba(255, 138, 0, 0.12); padding: 2px 8px; border-radius: 6px; font-weight: 700;">✏️ Guardado (sobreescribible)</span>' if already_exists_b else '<span style="font-size: 11px; color: #A09EB8;">⏳ Sin registro</span>'
-            st.markdown(f"<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 18px; font-weight: 900; color: #FF8A00;'>🏎️ {team_b}</span>{status_b_html}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 18px; font-weight: 900; color: #FF8A00;'>{team_badge(team_b, height=28)}</span>{status_b_html}</div>", unsafe_allow_html=True)
             col_chk_b1, col_chk_b2 = st.columns(2)
             with col_chk_b1:
                 b_dnf = st.checkbox("❌ DNF", key=chk_dnf_b_key, on_change=_on_toggle_dnf_b)
@@ -1072,8 +1101,8 @@ if selected_view == "📝 Pantalla de Edición y Registro":
             <thead>
                 <tr>
                     <th style="width: 28%;">Carrera</th>
-                    <th style="width: 36%; text-align: center; color: #00F0FF;">{team_a}</th>
-                    <th style="width: 36%; text-align: center; color: #FF8A00;">{team_b}</th>
+                    <th style="width: 36%; text-align: center; color: #00F0FF;">{team_badge(team_a, height=22)}</th>
+                    <th style="width: 36%; text-align: center; color: #FF8A00;">{team_badge(team_b, height=22)}</th>
                 </tr>
             </thead>
             <tbody>
@@ -1140,7 +1169,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         fs_badge = f'<span style="color:#FF8A00; font-weight:800;">{fs_cnt_val}</span>' if fs_cnt_val > 0 else '<span style="color:#6C6885;">0</span>'
 
         monitor_rows.append(f"""<tr>
-            <td style="font-weight: 700; color: #FFFFFF;">🏎️ {team}</td>
+            <td style="font-weight: 700; color: #FFFFFF;">{team_badge(team, height=24)}</td>
             {"".join(cells_race)}
             <td style="text-align: center; font-weight: 800; color: {badge_color};">{runs_done}/4</td>
             <td style="text-align: center;">{dnf_badge}</td>
@@ -1319,7 +1348,7 @@ else:
 
                 rows.append(f"""<tr>
                     <td style="text-align: center; font-weight: 800; color: #A09EB8;">#{ord_num}</td>
-                    <td style="font-weight: 800; color: #FFFFFF; font-size: 16px;">🏎️ {r['team']}</td>
+                    <td style="font-weight: 800; color: #FFFFFF; font-size: 16px;">{team_badge(r['team'], height=30)}</td>
                     <td style="text-align: right; color: #009FE3; font-weight: 900; font-size: 16px;">{tot_str}</td>
                     <td style="text-align: right; color: #ED6D05; font-weight: 900; font-size: 16px;">{car_str}</td>
                 </tr>""")
@@ -1356,26 +1385,29 @@ else:
         """)
 
         # Select from the 5 official matchups using Non-typeable Pills
+        h2h_matchup_labels = [m['label'] for m in matchups_list]
+        if st.session_state.get("slide3_matchup_selector") not in h2h_matchup_labels:
+            st.session_state["slide3_matchup_selector"] = h2h_matchup_labels[0]
         st.markdown("<div style='font-size: 14px; font-weight: 700; color: #E6E4F0; margin-bottom: 6px;'>⚔️ Seleccionar Enfrentamiento Oficial:</div>", unsafe_allow_html=True)
         selected_h2h_label = st.pills(
             "Seleccionar Enfrentamiento Oficial:",
-            options=[m['label'] for m in matchups_list],
-            default=matchups_list[0]['label'],
+            options=h2h_matchup_labels,
+            default=h2h_matchup_labels[0],
             key="slide3_matchup_selector",
             label_visibility="collapsed"
         )
-        if not selected_h2h_label:
-            selected_h2h_label = matchups_list[0]['label']
+        if not selected_h2h_label or selected_h2h_label not in h2h_matchup_labels:
+            selected_h2h_label = h2h_matchup_labels[0]
 
         current_matchup = next(m for m in matchups_list if m['label'] == selected_h2h_label)
         team_a = current_matchup['team_a']
         team_b = current_matchup['team_b']
 
         render_html(f"""
-        <div style="text-align: center; margin: 12px 0 24px 0;">
-            <span style="font-size: 28px; font-weight: 900; color: #00F0FF;">{team_a}</span>
-            <span style="font-size: 22px; font-weight: 900; color: #FF2A85; margin: 0 20px;">VS</span>
-            <span style="font-size: 28px; font-weight: 900; color: #FF8A00;">{team_b}</span>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 22px; margin: 12px 0 24px 0;">
+            <span style="font-size: 28px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=44, gap=12)}</span>
+            <span style="font-size: 22px; font-weight: 900; color: #FF2A85; margin: 0 8px;">VS</span>
+            <span style="font-size: 28px; font-weight: 900; color: #FF8A00;">{team_badge(team_b, height=44, gap=12)}</span>
         </div>
         """)
 
@@ -1484,10 +1516,10 @@ else:
                 <tr>
                     <th rowspan="2" style="vertical-align: middle; width: 14%; padding: 14px 16px;">Carrera</th>
                     <th colspan="3" style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); background: rgba(0, 240, 255, 0.15); color: #00F0FF; padding: 12px; font-size: 16px;">
-                        🏎️ {team_a}
+                        {team_badge(team_a, height=28)}
                     </th>
                     <th colspan="3" style="text-align: center; background: rgba(255, 138, 0, 0.15); color: #FF8A00; padding: 12px; font-size: 16px;">
-                        🏎️ {team_b}
+                        {team_badge(team_b, height=28)}
                     </th>
                 </tr>
                 <tr>
@@ -1539,7 +1571,7 @@ else:
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
             <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 12px; padding: 16px 20px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                    <span style="font-size: 18px; font-weight: 900; color: #009FE3;">🏎️ {team_a}</span>
+                    <span style="font-size: 18px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=30)}</span>
                     <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
@@ -1559,7 +1591,7 @@ else:
             </div>
             <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(237, 109, 5, 0.4); border-radius: 12px; padding: 16px 20px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                    <span style="font-size: 18px; font-weight: 900; color: #ED6D05;">🏎️ {team_b}</span>
+                    <span style="font-size: 18px; font-weight: 900; color: #ED6D05;">{team_badge(team_b, height=30)}</span>
                     <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
@@ -1611,7 +1643,7 @@ else:
             render_html(f"""
             <div class="sr-leader-banner">
                 <div style="display: flex; align-items: center; gap: 18px;">
-                    <div style="font-size: 42px;">🏎️</div>
+                    <div>{team_logo_only(leader_car_team, height=54, fallback_emoji="🏎️")}</div>
                     <div>
                         <div style="font-size: 12px; font-weight: 800; font-style: italic; color: #009FE3; text-transform: uppercase; letter-spacing: 1.5px;">
                             Mejor Tiempo de Carro de Todos (Líder de la Categoría)
@@ -1658,7 +1690,7 @@ else:
                 car_broadcast_rows.append(f"""<div class="sr-broadcast-row">
                     <div style="display: flex; align-items: center; gap: 16px;">
                         <div class="{rank_class}">{rank}</div>
-                        <div style="font-size: 20px;">🏎️</div>
+                        <div>{team_logo_only(team, height=34, fallback_emoji="🏎️")}</div>
                         <div>
                             <div class="sr-team-name">{team}</div>
                             {ind_display}
@@ -1708,7 +1740,7 @@ else:
             render_html(f"""
             <div class="sr-leader-banner" style="border-color: #ED6D05; box-shadow: 0 8px 30px rgba(237, 109, 5, 0.22);">
                 <div style="display: flex; align-items: center; gap: 18px;">
-                    <div style="font-size: 42px;">🚀</div>
+                    <div>{team_logo_only(leader_tot_team, height=54, fallback_emoji="🚀")}</div>
                     <div>
                         <div style="font-size: 12px; font-weight: 800; font-style: italic; color: #ED6D05; text-transform: uppercase; letter-spacing: 1.5px;">
                             Mejor Tiempo Más Rápido de Todos (Líder de la Categoría)
@@ -1762,7 +1794,7 @@ else:
                 tot_broadcast_rows.append(f"""<div class="sr-broadcast-row">
                     <div style="display: flex; align-items: center; gap: 16px;">
                         <div class="{rank_class}">{rank}</div>
-                        <div style="font-size: 20px;">🏎️</div>
+                        <div>{team_logo_only(team, height=34, fallback_emoji="🏎️")}</div>
                         <div>
                             <div class="sr-team-name">{team}</div>
                             {detail_html}
