@@ -552,7 +552,7 @@ def render_app_header(logo_b64: str = "") -> str:
             <h1 class="sr-header-title">Visualizador de Resultados</h1>
         </div>
     </div>
-    <div class="sr-header-tag">#STEMRacing</div>
+    <div class="sr-header-tag">@STEMRacingPa</div>
 </div>"""
     return html
 
