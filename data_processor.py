@@ -43,8 +43,7 @@ DEFAULT_TEAMS = [
     "Dim3nsion",
     "Raiders",
     "Cybercolts Racing",
-    "PNTHR",
-    "ISP"
+    "PNTHR"
 ]
 
 LEGACY_TEAM_MAP = {
@@ -57,7 +56,6 @@ LEGACY_TEAM_MAP = {
     "Brader": "Raiders",
     "TJS": "Cybercolts Racing",
     "Casco": "PNTHR",
-    "ISP": "ISP",
 }
 
 SCHOOL_TO_TEAM_MAP = {
@@ -74,8 +72,6 @@ SCHOOL_TO_TEAM_MAP = {
     "thomas jefferson": "Cybercolts Racing",
     "tjs": "Cybercolts Racing",
     "casco": "PNTHR",
-    "international school of panama": "ISP",
-    "isp": "ISP",
 }
 
 
@@ -99,8 +95,9 @@ def load_teams_from_csv(path: str = "Equipos.csv") -> List[str]:
 
 def get_matchups(teams: List[str]) -> List[Dict[str, Any]]:
     """
-    Build the 5 fixed head-to-head pairings based on team order:
-    1 vs 2, 3 vs 4, 5 vs 6, 7 vs 8, 9 vs 10.
+    Build the official head-to-head pairings based on team order:
+    1 vs 2, 3 vs 4, 5 vs 6, 7 vs 8, and if an odd number of teams (9),
+    team 9 (PNTHR) races solo in Enfrentamiento 5 for all scoring purposes.
     """
     matchups = []
     n = len(teams)
@@ -112,7 +109,17 @@ def get_matchups(teams: List[str]) -> List[Dict[str, Any]]:
             "id": i + 1,
             "label": f"Enfrentamiento {i + 1}: {t_a} vs {t_b}",
             "team_a": t_a,
-            "team_b": t_b
+            "team_b": t_b,
+            "is_solo": False
+        })
+    if n % 2 == 1:
+        t_solo = teams[-1]
+        matchups.append({
+            "id": pair_count + 1,
+            "label": f"Enfrentamiento {pair_count + 1}: {t_solo} (Individual)",
+            "team_a": t_solo,
+            "team_b": None,
+            "is_solo": True
         })
     return matchups
 

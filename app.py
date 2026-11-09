@@ -91,7 +91,7 @@ def normalize_runs_df(df: pd.DataFrame) -> pd.DataFrame:
         if col not in cleaned.columns:
             cleaned[col] = False if col in ('is_dnf', 'is_false_start') else (0.0 if 'time' in col else '')
     cleaned['team'] = cleaned['team'].astype(str).str.strip().replace(dp.LEGACY_TEAM_MAP)
-    cleaned = cleaned[cleaned['team'] != '']
+    cleaned = cleaned[cleaned['team'].isin(official_teams)]
     cleaned['race_number'] = pd.to_numeric(cleaned['race_number'], errors='coerce').fillna(1).astype(int)
     cleaned['reaction_time'] = pd.to_numeric(cleaned['reaction_time'], errors='coerce').fillna(0.0).astype(float)
     cleaned['is_dnf'] = cleaned['is_dnf'].astype(bool)
@@ -619,7 +619,7 @@ def render_podium_intro_slide():
 
 
 def render_podium_full_slide():
-    """Full podium presentation with 3D pedestals and positions 4-10 split side-by-side."""
+    """Full podium presentation with 3D pedestals and positions 4-9 split side-by-side."""
     if df_championship.empty:
         st.info("ℹ️ No hay datos de podio disponibles aún.")
         return
@@ -635,9 +635,9 @@ def render_podium_full_slide():
     t3_name = t3['team'] if t3 is not None else 'Equipo 3'
     t3_pts = format_pts(t3['Total']) if t3 is not None else "0"
 
-    # Positions 4-6 (Left) and 7-10 (Right)
+    # Positions 4-6 (Left) and 7-9 (Right) for the 9 competing teams
     t4_6 = df_championship[df_championship['rank'].isin([4, 5, 6])].sort_values(by='rank')
-    t7_10 = df_championship[df_championship['rank'].isin([7, 8, 9, 10])].sort_values(by='rank')
+    t7_9 = df_championship[df_championship['rank'].isin([7, 8, 9])].sort_values(by='rank')
 
     def build_mini_table(df_subset):
         rows = []
@@ -666,7 +666,7 @@ def render_podium_full_slide():
         </table>"""
 
     table_4_6 = build_mini_table(t4_6)
-    table_7_10 = build_mini_table(t7_10)
+    table_7_9 = build_mini_table(t7_9)
 
     podium_ceremony_html = f"""
     <div key="podium-full-{st.session_state.podium_anim_nonce}">
@@ -717,7 +717,7 @@ def render_podium_full_slide():
                     {table_4_6}
                 </div>
                 <div>
-                    {table_7_10}
+                    {table_7_9}
                 </div>
             </div>
         </div>
@@ -797,6 +797,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
     selected_matchup = next(m for m in matchups_list if m['label'] == selected_matchup_label)
     team_a = selected_matchup['team_a']
     team_b = selected_matchup['team_b']
+    is_solo_matchup = (team_b is None) or bool(selected_matchup.get('is_solo', False))
 
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
@@ -819,15 +820,18 @@ if selected_view == "📝 Pantalla de Edición y Registro":
     curr_runs = st.session_state.runs_df
     if not curr_runs.empty:
         mask_exist_a = (curr_runs['team'].astype(str).str.strip() == team_a) & (pd.to_numeric(curr_runs['race_number'], errors='coerce') == int(selected_race_num))
-        mask_exist_b = (curr_runs['team'].astype(str).str.strip() == team_b) & (pd.to_numeric(curr_runs['race_number'], errors='coerce') == int(selected_race_num))
         run_a = curr_runs[mask_exist_a]
-        run_b = curr_runs[mask_exist_b]
+        if not is_solo_matchup:
+            mask_exist_b = (curr_runs['team'].astype(str).str.strip() == team_b) & (pd.to_numeric(curr_runs['race_number'], errors='coerce') == int(selected_race_num))
+            run_b = curr_runs[mask_exist_b]
+        else:
+            run_b = pd.DataFrame()
     else:
         run_a = pd.DataFrame()
         run_b = pd.DataFrame()
 
     already_exists_a = not run_a.empty
-    already_exists_b = not run_b.empty
+    already_exists_b = (not is_solo_matchup) and (not run_b.empty)
 
     def get_run_init_vals(run_df: pd.DataFrame):
         if not run_df.empty:
@@ -861,10 +865,11 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         st.session_state[num_rxn_a_key] = init_a_rxn
         st.session_state[num_race_a_key] = init_a_race
 
-        st.session_state[chk_dnf_b_key] = init_b_dnf
-        st.session_state[chk_fs_b_key] = init_b_fs
-        st.session_state[num_rxn_b_key] = init_b_rxn
-        st.session_state[num_race_b_key] = init_b_race
+        if not is_solo_matchup:
+            st.session_state[chk_dnf_b_key] = init_b_dnf
+            st.session_state[chk_fs_b_key] = init_b_fs
+            st.session_state[num_rxn_b_key] = init_b_rxn
+            st.session_state[num_race_b_key] = init_b_race
         st.session_state["_last_active_form_ctx"] = active_form_ctx
 
     for _k, _def_v in [
@@ -918,30 +923,35 @@ if selected_view == "📝 Pantalla de Edición y Registro":
             help="Genera valores aleatorios basados en el Excel de referencia (incluyendo probabilidad de DNF o False Start) y puntuaciones aleatorias de categorías para esta carrera."
         ):
             rnd_a_dnf, rnd_a_fs, rnd_a_rxn, rnd_a_race = dp.generate_random_test_run()
-            rnd_b_dnf, rnd_b_fs, rnd_b_rxn, rnd_b_race = dp.generate_random_test_run()
-
             st.session_state[chk_dnf_a_key] = rnd_a_dnf
             st.session_state[chk_fs_a_key] = rnd_a_fs
             st.session_state[num_rxn_a_key] = rnd_a_rxn
             st.session_state[num_race_a_key] = rnd_a_race
+            lbl_a = "DNF" if rnd_a_dnf else ("False Start" if rnd_a_fs else f"{rnd_a_rxn + rnd_a_race:.3f}s")
 
-            st.session_state[chk_dnf_b_key] = rnd_b_dnf
-            st.session_state[chk_fs_b_key] = rnd_b_fs
-            st.session_state[num_rxn_b_key] = rnd_b_rxn
-            st.session_state[num_race_b_key] = rnd_b_race
+            teams_to_randomize = [team_a]
+            if not is_solo_matchup:
+                rnd_b_dnf, rnd_b_fs, rnd_b_rxn, rnd_b_race = dp.generate_random_test_run()
+                st.session_state[chk_dnf_b_key] = rnd_b_dnf
+                st.session_state[chk_fs_b_key] = rnd_b_fs
+                st.session_state[num_rxn_b_key] = rnd_b_rxn
+                st.session_state[num_race_b_key] = rnd_b_race
+                lbl_b = "DNF" if rnd_b_dnf else ("False Start" if rnd_b_fs else f"{rnd_b_rxn + rnd_b_race:.3f}s")
+                teams_to_randomize.append(team_b)
 
             # Randomize non-racing category scores for the teams in the selected race
             if st.session_state.custom_scores is not None:
-                for t_name in [team_a, team_b]:
+                for t_name in teams_to_randomize:
                     rnd_scores = dp.generate_random_judge_scores_for_team()
                     t_mask = st.session_state.custom_scores['team'] == t_name
                     for cat_col, val in rnd_scores.items():
                         st.session_state.custom_scores.loc[t_mask, cat_col] = val
                 save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
 
-            lbl_a = "DNF" if rnd_a_dnf else ("False Start" if rnd_a_fs else f"{rnd_a_rxn + rnd_a_race:.3f}s")
-            lbl_b = "DNF" if rnd_b_dnf else ("False Start" if rnd_b_fs else f"{rnd_b_rxn + rnd_b_race:.3f}s")
-            st.toast(f"🎲 Test Mode (Carrera {selected_race_num}): {team_a} [{lbl_a}] | {team_b} [{lbl_b}]. Presiona Guardar para registrar.")
+            if is_solo_matchup:
+                st.toast(f"🎲 Test Mode (Carrera {selected_race_num}): {team_a} [{lbl_a}]. Presiona Guardar para registrar.")
+            else:
+                st.toast(f"🎲 Test Mode (Carrera {selected_race_num}): {team_a} [{lbl_a}] | {team_b} [{lbl_b}]. Presiona Guardar para registrar.")
 
         # Checkboxes outside form so clicking DNF or False Start immediately disables inputs in gray
         col_fa_top, col_fb_top = st.columns(2)
@@ -955,13 +965,18 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                 a_fs = st.checkbox("🚦 False Start", key=chk_fs_a_key, on_change=_on_toggle_fs_a, help="Salida en falso y forfeit de carrera.")
 
         with col_fb_top:
-            status_b_html = '<span style="font-size: 11px; color: #FF8A00; background: rgba(255, 138, 0, 0.12); padding: 2px 8px; border-radius: 6px; font-weight: 700;">✏️ Guardado (sobreescribible)</span>' if already_exists_b else '<span style="font-size: 11px; color: #A09EB8;">⏳ Sin registro</span>'
-            st.markdown(f"<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 18px; font-weight: 900; color: #FF8A00;'>{team_badge(team_b, height=28)}</span>{status_b_html}</div>", unsafe_allow_html=True)
-            col_chk_b1, col_chk_b2 = st.columns(2)
-            with col_chk_b1:
-                b_dnf = st.checkbox("❌ DNF", key=chk_dnf_b_key, on_change=_on_toggle_dnf_b)
-            with col_chk_b2:
-                b_fs = st.checkbox("🚦 False Start", key=chk_fs_b_key, on_change=_on_toggle_fs_b, help="Salida en falso y forfeit de carrera.")
+            if not is_solo_matchup:
+                status_b_html = '<span style="font-size: 11px; color: #FF8A00; background: rgba(255, 138, 0, 0.12); padding: 2px 8px; border-radius: 6px; font-weight: 700;">✏️ Guardado (sobreescribible)</span>' if already_exists_b else '<span style="font-size: 11px; color: #A09EB8;">⏳ Sin registro</span>'
+                st.markdown(f"<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 18px; font-weight: 900; color: #FF8A00;'>{team_badge(team_b, height=28)}</span>{status_b_html}</div>", unsafe_allow_html=True)
+                col_chk_b1, col_chk_b2 = st.columns(2)
+                with col_chk_b1:
+                    b_dnf = st.checkbox("❌ DNF", key=chk_dnf_b_key, on_change=_on_toggle_dnf_b)
+                with col_chk_b2:
+                    b_fs = st.checkbox("🚦 False Start", key=chk_fs_b_key, on_change=_on_toggle_fs_b, help="Salida en falso y forfeit de carrera.")
+            else:
+                b_dnf = False
+                b_fs = False
+                st.markdown("<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 15px; font-weight: 800; color: #A09EB8;'>🏎️ Modalidad Individual</span><span style='font-size: 11px; color: #FCBC00; background: rgba(252, 188, 0, 0.14); padding: 2px 8px; border-radius: 6px; font-weight: 700;'>Sin Oponente</span></div>", unsafe_allow_html=True)
 
         # Time inputs + Submit inside form so typing a correction and clicking Guardar commits on 1st click
         with st.form(key=f"race_entry_form_{team_a}_{team_b}_{selected_race_num}", clear_on_submit=False, border=False):
@@ -993,10 +1008,20 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                     </div>""")
 
             # -----------------------------
-            # TEAM B INPUTS
+            # TEAM B INPUTS (OR SOLO CARD)
             # -----------------------------
             with col_fb:
-                if b_fs:
+                if is_solo_matchup:
+                    b_rxn = 0.0
+                    b_race = 0.0
+                    render_html(f"""<div style="text-align: center; padding: 28px 16px; background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.18); border-radius: 12px; margin: 8px 0;">
+                        <div style="font-size: 28px; margin-bottom: 6px;">🏁</div>
+                        <div style="font-size: 14px; font-weight: 800; color: #FFFFFF; text-transform: uppercase; letter-spacing: 0.8px;">Carrera Individual</div>
+                        <div style="font-size: 12px; color: #A09EB8; margin-top: 6px; line-height: 1.4;">
+                            <strong>{team_a}</strong> corre de forma individual en pista para todos los cálculos oficiales de puntuación (Tiempo de Carro y Tiempo Más Rápido).
+                        </div>
+                    </div>""")
+                elif b_fs:
                     st.text_input("T. Reacción (s):", value="False Start", disabled=True, key=f"txt_rxn_b_{team_b}_{selected_race_num}_fs")
                     st.text_input("T. Carrera (s):", value="False Start", disabled=True, key=f"txt_race_b_{team_b}_{selected_race_num}_fs")
                     b_rxn = 0.0
@@ -1026,7 +1051,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
 
         if submit_matchup_race:
             has_data_a = bool(a_dnf or a_fs or (a_race > 0) or (a_rxn > 0))
-            has_data_b = bool(b_dnf or b_fs or (b_race > 0) or (b_rxn > 0))
+            has_data_b = (not is_solo_matchup) and bool(b_dnf or b_fs or (b_race > 0) or (b_rxn > 0))
 
             if not has_data_a and not has_data_b and not already_exists_a and not already_exists_b:
                 st.warning("⚠️ No se ingresaron tiempos ni estados (DNF/FS) para guardar.")
@@ -1042,18 +1067,6 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                     'is_false_start': bool(a_fs)
                 }
 
-                is_inv_b = bool(b_dnf or b_fs)
-                row_dict_b = {
-                    'team': team_b,
-                    'race_number': int(selected_race_num),
-                    'reaction_time': round(float(b_rxn), 4) if not is_inv_b else 0.0,
-                    'race_time': np.nan if is_inv_b else round(float(b_race), 4),
-                    'total_time': np.nan if is_inv_b else round(float(b_rxn + b_race), 4),
-                    'is_dnf': bool(b_dnf and not b_fs),
-                    'is_false_start': bool(b_fs)
-                }
-
-                # Determine which team(s) were added or modified to append to the CSV audit log
                 changed_a = (
                     (not already_exists_a and has_data_a) or
                     (already_exists_a and (
@@ -1062,26 +1075,39 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                         (not is_inv_a and (abs(float(a_rxn) - init_a_rxn) > 1e-6 or abs(float(a_race) - init_a_race) > 1e-6))
                     ))
                 )
-                changed_b = (
-                    (not already_exists_b and has_data_b) or
-                    (already_exists_b and (
-                        (row_dict_b['is_dnf'] != init_b_dnf) or
-                        (row_dict_b['is_false_start'] != init_b_fs) or
-                        (not is_inv_b and (abs(float(b_rxn) - init_b_rxn) > 1e-6 or abs(float(b_race) - init_b_race) > 1e-6))
-                    ))
-                )
 
                 rows_to_append = []
                 if changed_a:
                     rows_to_append.append(row_dict_a)
-                if changed_b:
-                    rows_to_append.append(row_dict_b)
+
+                changed_b = False
+                if not is_solo_matchup:
+                    is_inv_b = bool(b_dnf or b_fs)
+                    row_dict_b = {
+                        'team': team_b,
+                        'race_number': int(selected_race_num),
+                        'reaction_time': round(float(b_rxn), 4) if not is_inv_b else 0.0,
+                        'race_time': np.nan if is_inv_b else round(float(b_race), 4),
+                        'total_time': np.nan if is_inv_b else round(float(b_rxn + b_race), 4),
+                        'is_dnf': bool(b_dnf and not b_fs),
+                        'is_false_start': bool(b_fs)
+                    }
+                    changed_b = (
+                        (not already_exists_b and has_data_b) or
+                        (already_exists_b and (
+                            (row_dict_b['is_dnf'] != init_b_dnf) or
+                            (row_dict_b['is_false_start'] != init_b_fs) or
+                            (not is_inv_b and (abs(float(b_rxn) - init_b_rxn) > 1e-6 or abs(float(b_race) - init_b_race) > 1e-6))
+                        ))
+                    )
+                    if changed_b:
+                        rows_to_append.append(row_dict_b)
 
                 # If user clicked Guardar again on existing data without changing values, still append a timestamped record
                 if not rows_to_append:
                     if has_data_a or already_exists_a:
                         rows_to_append.append(row_dict_a)
-                    if has_data_b or already_exists_b:
+                    if not is_solo_matchup and (has_data_b or already_exists_b):
                         rows_to_append.append(row_dict_b)
 
                 was_overwrite = (already_exists_a and changed_a) or (already_exists_b and changed_b) or (already_exists_a or already_exists_b)
@@ -1094,101 +1120,143 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                 st.rerun()
 
     with col_history_area:
+        hist_title_right = f"{team_a} (Individual)" if is_solo_matchup else f"{team_a} vs {team_b}"
         render_html(f"""
         <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 14px; padding: 18px 20px 10px 20px; margin-bottom: 16px;">
             <div style="font-size: 18px; font-weight: 900; color: #FFFFFF; display: flex; align-items: center; justify-content: space-between;">
                 <span>⚔️ Historial del Enfrentamiento</span>
-                <span style="font-size: 14px; color: #00F0FF; font-weight: 800;">{team_a} vs {team_b}</span>
+                <span style="font-size: 14px; color: #00F0FF; font-weight: 800;">{hist_title_right}</span>
             </div>
             <div style="font-size: 13px; color: #A09EB8; margin-top: 4px;">
-                Resumen de las 4 carreras oficiales de este duelo directo.
+                Resumen de las 4 carreras oficiales registradas en pista.
             </div>
         </div>
         """)
 
-        # Table of 4 races for this matchup
-        history_rows = []
-        for r_num in range(1, 5):
-            ra = curr_runs[(curr_runs['team'] == team_a) & (curr_runs['race_number'] == r_num)]
-            rb = curr_runs[(curr_runs['team'] == team_b) & (curr_runs['race_number'] == r_num)]
-
-            if not ra.empty:
-                r_row_a = ra.iloc[-1]
-                if r_row_a.get('is_false_start', False):
-                    cell_a = '<span class="sr-fs-badge">FALSE START</span>'
-                elif r_row_a.get('is_dnf', False):
-                    cell_a = '<span class="sr-dnf-badge">DNF</span>'
-                else:
-                    tot_a_val = r_row_a.get('total_time', 0.0)
-                    cell_a = f'<strong style="color: #00F0FF;">{tot_a_val:.3f}s</strong> <span style="font-size:11px; color:#A09EB8;">({r_row_a.get("race_time", 0.0):.3f}s carro)</span>'
-            else:
-                cell_a = '<span class="sr-pending-badge">⏳ Pendiente</span>'
-
-            if not rb.empty:
-                r_row_b = rb.iloc[-1]
-                if r_row_b.get('is_false_start', False):
-                    cell_b = '<span class="sr-fs-badge">FALSE START</span>'
-                elif r_row_b.get('is_dnf', False):
-                    cell_b = '<span class="sr-dnf-badge">DNF</span>'
-                else:
-                    tot_b_val = r_row_b.get('total_time', 0.0)
-                    cell_b = f'<strong style="color: #FF8A00;">{tot_b_val:.3f}s</strong> <span style="font-size:11px; color:#A09EB8;">({r_row_b.get("race_time", 0.0):.3f}s carro)</span>'
-            else:
-                cell_b = '<span class="sr-pending-badge">⏳ Pendiente</span>'
-
-            history_rows.append(f"""<tr>
-                <td style="font-weight: 800; color: #FFFFFF;">Carrera {r_num}</td>
-                <td style="text-align: center;">{cell_a}</td>
-                <td style="text-align: center;">{cell_b}</td>
-            </tr>""")
-
-        # Extract best times for both teams in this matchup
         sum_a = df_teams_summary[df_teams_summary['team'] == team_a].iloc[0] if (df_teams_summary is not None and not df_teams_summary[df_teams_summary['team'] == team_a].empty) else None
-        sum_b = df_teams_summary[df_teams_summary['team'] == team_b].iloc[0] if (df_teams_summary is not None and not df_teams_summary[df_teams_summary['team'] == team_b].empty) else None
-
         best_tot_a_val = sum_a['min_total_time'] if sum_a is not None else None
         car_time_a_val = sum_a['avg_race_time'] if sum_a is not None else None
-        best_tot_b_val = sum_b['min_total_time'] if sum_b is not None else None
-        car_time_b_val = sum_b['avg_race_time'] if sum_b is not None else None
-
         best_tot_a_txt = f"{best_tot_a_val:.3f} s" if (pd.notna(best_tot_a_val) and best_tot_a_val > 0) else "Pendiente"
         car_time_a_txt = f"{car_time_a_val:.3f} s" if (pd.notna(car_time_a_val) and car_time_a_val > 0) else "Pendiente"
-        best_tot_b_txt = f"{best_tot_b_val:.3f} s" if (pd.notna(best_tot_b_val) and best_tot_b_val > 0) else "Pendiente"
-        car_time_b_txt = f"{car_time_b_val:.3f} s" if (pd.notna(car_time_b_val) and car_time_b_val > 0) else "Pendiente"
 
-        hist_table_html = f"""<table class="sr-pptx-table" style="font-size: 13px;">
-            <thead>
-                <tr>
-                    <th style="width: 28%;">Carrera</th>
-                    <th style="width: 36%; text-align: center; color: #00F0FF;">{team_badge(team_a, height=22)}</th>
-                    <th style="width: 36%; text-align: center; color: #FF8A00;">{team_badge(team_b, height=22)}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {"".join(history_rows)}
-            </tbody>
-            <tfoot>
-                <tr style="background: rgba(255, 255, 255, 0.05); border-top: 2px solid rgba(255, 42, 133, 0.4);">
-                    <td style="font-weight: 800; color: #FFFFFF; font-size: 12px;">🏎️ Tiempo de Carro</td>
-                    <td style="text-align: center; font-weight: 800; color: #00F0FF;">{car_time_a_txt}</td>
-                    <td style="text-align: center; font-weight: 800; color: #FF8A00;">{car_time_b_txt}</td>
-                </tr>
-                <tr style="background: rgba(255, 42, 133, 0.12);">
-                    <td style="font-weight: 800; color: #FFFFFF; font-size: 12px;">🚀 Mejor T. Total</td>
-                    <td style="text-align: center; font-weight: 900; color: #00F0FF;">{best_tot_a_txt}</td>
-                    <td style="text-align: center; font-weight: 900; color: #FF8A00;">{best_tot_b_txt}</td>
-                </tr>
-            </tfoot>
-        </table>"""
+        if is_solo_matchup:
+            history_rows = []
+            for r_num in range(1, 5):
+                ra = curr_runs[(curr_runs['team'] == team_a) & (curr_runs['race_number'] == r_num)]
+                if not ra.empty:
+                    r_row_a = ra.iloc[-1]
+                    if r_row_a.get('is_false_start', False):
+                        cell_a = '<span class="sr-fs-badge">FALSE START</span>'
+                    elif r_row_a.get('is_dnf', False):
+                        cell_a = '<span class="sr-dnf-badge">DNF</span>'
+                    else:
+                        tot_a_val = r_row_a.get('total_time', 0.0)
+                        cell_a = f'<strong style="color: #00F0FF;">{tot_a_val:.3f}s</strong> <span style="font-size:11px; color:#A09EB8;">(Reacción: {r_row_a.get("reaction_time", 0.0):.3f}s | Carro: {r_row_a.get("race_time", 0.0):.3f}s)</span>'
+                else:
+                    cell_a = '<span class="sr-pending-badge">⏳ Pendiente</span>'
+
+                history_rows.append(f"""<tr>
+                    <td style="font-weight: 800; color: #FFFFFF;">Carrera {r_num}</td>
+                    <td style="text-align: center;">{cell_a}</td>
+                </tr>""")
+
+            hist_table_html = f"""<table class="sr-pptx-table" style="font-size: 13px;">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Carrera</th>
+                        <th style="width: 70%; text-align: center; color: #00F0FF;">{team_badge(team_a, height=22)}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {"".join(history_rows)}
+                </tbody>
+                <tfoot>
+                    <tr style="background: rgba(255, 255, 255, 0.05); border-top: 2px solid rgba(255, 42, 133, 0.4);">
+                        <td style="font-weight: 800; color: #FFFFFF; font-size: 12px;">🏎️ Tiempo de Carro</td>
+                        <td style="text-align: center; font-weight: 800; color: #00F0FF;">{car_time_a_txt}</td>
+                    </tr>
+                    <tr style="background: rgba(255, 42, 133, 0.12);">
+                        <td style="font-weight: 800; color: #FFFFFF; font-size: 12px;">🚀 Mejor T. Total</td>
+                        <td style="text-align: center; font-weight: 900; color: #00F0FF;">{best_tot_a_txt}</td>
+                    </tr>
+                </tfoot>
+            </table>"""
+        else:
+            # Table of 4 races for this 2-team matchup
+            history_rows = []
+            for r_num in range(1, 5):
+                ra = curr_runs[(curr_runs['team'] == team_a) & (curr_runs['race_number'] == r_num)]
+                rb = curr_runs[(curr_runs['team'] == team_b) & (curr_runs['race_number'] == r_num)]
+
+                if not ra.empty:
+                    r_row_a = ra.iloc[-1]
+                    if r_row_a.get('is_false_start', False):
+                        cell_a = '<span class="sr-fs-badge">FALSE START</span>'
+                    elif r_row_a.get('is_dnf', False):
+                        cell_a = '<span class="sr-dnf-badge">DNF</span>'
+                    else:
+                        tot_a_val = r_row_a.get('total_time', 0.0)
+                        cell_a = f'<strong style="color: #00F0FF;">{tot_a_val:.3f}s</strong> <span style="font-size:11px; color:#A09EB8;">({r_row_a.get("race_time", 0.0):.3f}s carro)</span>'
+                else:
+                    cell_a = '<span class="sr-pending-badge">⏳ Pendiente</span>'
+
+                if not rb.empty:
+                    r_row_b = rb.iloc[-1]
+                    if r_row_b.get('is_false_start', False):
+                        cell_b = '<span class="sr-fs-badge">FALSE START</span>'
+                    elif r_row_b.get('is_dnf', False):
+                        cell_b = '<span class="sr-dnf-badge">DNF</span>'
+                    else:
+                        tot_b_val = r_row_b.get('total_time', 0.0)
+                        cell_b = f'<strong style="color: #FF8A00;">{tot_b_val:.3f}s</strong> <span style="font-size:11px; color:#A09EB8;">({r_row_b.get("race_time", 0.0):.3f}s carro)</span>'
+                else:
+                    cell_b = '<span class="sr-pending-badge">⏳ Pendiente</span>'
+
+                history_rows.append(f"""<tr>
+                    <td style="font-weight: 800; color: #FFFFFF;">Carrera {r_num}</td>
+                    <td style="text-align: center;">{cell_a}</td>
+                    <td style="text-align: center;">{cell_b}</td>
+                </tr>""")
+
+            sum_b = df_teams_summary[df_teams_summary['team'] == team_b].iloc[0] if (df_teams_summary is not None and not df_teams_summary[df_teams_summary['team'] == team_b].empty) else None
+            best_tot_b_val = sum_b['min_total_time'] if sum_b is not None else None
+            car_time_b_val = sum_b['avg_race_time'] if sum_b is not None else None
+            best_tot_b_txt = f"{best_tot_b_val:.3f} s" if (pd.notna(best_tot_b_val) and best_tot_b_val > 0) else "Pendiente"
+            car_time_b_txt = f"{car_time_b_val:.3f} s" if (pd.notna(car_time_b_val) and car_time_b_val > 0) else "Pendiente"
+
+            hist_table_html = f"""<table class="sr-pptx-table" style="font-size: 13px;">
+                <thead>
+                    <tr>
+                        <th style="width: 28%;">Carrera</th>
+                        <th style="width: 36%; text-align: center; color: #00F0FF;">{team_badge(team_a, height=22)}</th>
+                        <th style="width: 36%; text-align: center; color: #FF8A00;">{team_badge(team_b, height=22)}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {"".join(history_rows)}
+                </tbody>
+                <tfoot>
+                    <tr style="background: rgba(255, 255, 255, 0.05); border-top: 2px solid rgba(255, 42, 133, 0.4);">
+                        <td style="font-weight: 800; color: #FFFFFF; font-size: 12px;">🏎️ Tiempo de Carro</td>
+                        <td style="text-align: center; font-weight: 800; color: #00F0FF;">{car_time_a_txt}</td>
+                        <td style="text-align: center; font-weight: 800; color: #FF8A00;">{car_time_b_txt}</td>
+                    </tr>
+                    <tr style="background: rgba(255, 42, 133, 0.12);">
+                        <td style="font-weight: 800; color: #FFFFFF; font-size: 12px;">🚀 Mejor T. Total</td>
+                        <td style="text-align: center; font-weight: 900; color: #00F0FF;">{best_tot_a_txt}</td>
+                        <td style="text-align: center; font-weight: 900; color: #FF8A00;">{best_tot_b_txt}</td>
+                    </tr>
+                </tfoot>
+            </table>"""
         render_html(hist_table_html)
 
     st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
 
-    # --- TOURNAMENT PROGRESS MONITOR (10 TEAMS x 4 RACES) ---
-    render_html("""
+    # --- TOURNAMENT PROGRESS MONITOR (9 TEAMS x 4 RACES) ---
+    render_html(f"""
     <div style="background: rgba(18, 12, 36, 0.7); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 18px 20px 10px 20px; margin-bottom: 16px;">
         <div style="font-size: 20px; font-weight: 900; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
-            <span>📋</span> Monitor General del Torneo (10 Equipos Oficiales)
+            <span>📋</span> Monitor General del Torneo ({len(official_teams)} Equipos Oficiales)
         </div>
         <div style="font-size: 13px; color: #A09EB8; margin-top: 4px;">
             Seguimiento en tiempo real de las 4 carreras de cada equipo, estado de DNF, False Starts, tiempo de carro y mejor tiempo total.
@@ -1461,23 +1529,32 @@ else:
         current_matchup = next(m for m in matchups_list if m['label'] == selected_h2h_label)
         team_a = current_matchup['team_a']
         team_b = current_matchup['team_b']
+        is_solo_h2h = (team_b is None) or bool(current_matchup.get('is_solo', False))
 
-        render_html(f"""
-        <div style="display: flex; justify-content: center; align-items: center; gap: 22px; margin: 12px 0 24px 0;">
-            <span style="font-size: 28px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=44, gap=12)}</span>
-            <span style="font-size: 22px; font-weight: 900; color: #FF2A85; margin: 0 8px;">VS</span>
-            <span style="font-size: 28px; font-weight: 900; color: #FF8A00;">{team_badge(team_b, height=44, gap=12)}</span>
-        </div>
-        """)
+        if is_solo_h2h:
+            render_html(f"""
+            <div style="display: flex; justify-content: center; align-items: center; gap: 18px; margin: 12px 0 24px 0;">
+                <span style="font-size: 28px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=44, gap=12)}</span>
+                <span style="font-size: 14px; font-weight: 800; color: #FCBC00; background: rgba(252, 188, 0, 0.14); border: 1px solid rgba(252, 188, 0, 0.45); padding: 6px 14px; border-radius: 20px; letter-spacing: 1px;">🏁 CARRERA INDIVIDUAL</span>
+            </div>
+            """)
+        else:
+            render_html(f"""
+            <div style="display: flex; justify-content: center; align-items: center; gap: 22px; margin: 12px 0 24px 0;">
+                <span style="font-size: 28px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=44, gap=12)}</span>
+                <span style="font-size: 22px; font-weight: 900; color: #FF2A85; margin: 0 8px;">VS</span>
+                <span style="font-size: 28px; font-weight: 900; color: #FF8A00;">{team_badge(team_b, height=44, gap=12)}</span>
+            </div>
+            """)
 
-        # Build the 4-race rows for both teams
+        # Build the 4-race rows for team_a (and team_b if not solo)
         runs_a = df_runs[df_runs['team'] == team_a].sort_values(by='race_number')
-        runs_b = df_runs[df_runs['team'] == team_b].sort_values(by='race_number')
+        runs_b = df_runs[df_runs['team'] == team_b].sort_values(by='race_number') if not is_solo_h2h else pd.DataFrame()
 
         h2h_table_rows = []
         for r_num in range(1, 5):
             match_a = runs_a[runs_a['race_number'] == r_num]
-            match_b = runs_b[runs_b['race_number'] == r_num]
+            match_b = runs_b[runs_b['race_number'] == r_num] if not is_solo_h2h else pd.DataFrame()
 
             # Team A cells
             if not match_a.empty:
@@ -1504,7 +1581,7 @@ else:
                 tot_a_num = None
 
             # Team B cells
-            if not match_b.empty:
+            if not is_solo_h2h and not match_b.empty:
                 rb = match_b.iloc[0]
                 if rb.get('is_false_start', False):
                     rxn_b_str = '<span class="sr-fs-badge">FALSE START</span>'
@@ -1533,144 +1610,215 @@ else:
                 'rxn_b_str': rxn_b_str, 'race_b_str': race_b_str, 'tot_b_str': tot_b_str, 'tot_b_num': tot_b_num
             })
 
-        # Extract best times for both teams in this head-to-head matchup
+        # Extract best times for team_a (and team_b if not solo)
         sum_h2h_a = df_teams_summary[df_teams_summary['team'] == team_a].iloc[0] if (df_teams_summary is not None and not df_teams_summary[df_teams_summary['team'] == team_a].empty) else None
-        sum_h2h_b = df_teams_summary[df_teams_summary['team'] == team_b].iloc[0] if (df_teams_summary is not None and not df_teams_summary[df_teams_summary['team'] == team_b].empty) else None
-
         tot_a_val = sum_h2h_a['min_total_time'] if sum_h2h_a is not None else None
         car_a_val = sum_h2h_a['avg_race_time'] if sum_h2h_a is not None else None
         rxn_a_val = sum_h2h_a['min_rxn_time'] if sum_h2h_a is not None else None
-        race_a_val = sum_h2h_a['min_race_time'] if sum_h2h_a is not None else None
-
-        tot_b_val = sum_h2h_b['min_total_time'] if sum_h2h_b is not None else None
-        car_b_val = sum_h2h_b['avg_race_time'] if sum_h2h_b is not None else None
-        rxn_b_val = sum_h2h_b['min_rxn_time'] if sum_h2h_b is not None else None
-        race_b_val = sum_h2h_b['min_race_time'] if sum_h2h_b is not None else None
 
         tot_a_txt = f"{tot_a_val:.3f} s" if (pd.notna(tot_a_val) and tot_a_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
         car_a_txt = f"{car_a_val:.3f} s" if (pd.notna(car_a_val) and car_a_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
         rxn_a_txt = f"{rxn_a_val:.3f} s" if (pd.notna(rxn_a_val) and rxn_a_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
-        race_a_txt = f"{race_a_val:.3f} s" if (pd.notna(race_a_val) and race_a_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
 
-        tot_b_txt = f"{tot_b_val:.3f} s" if (pd.notna(tot_b_val) and tot_b_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
-        car_b_txt = f"{car_b_val:.3f} s" if (pd.notna(car_b_val) and car_b_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
-        rxn_b_txt = f"{rxn_b_val:.3f} s" if (pd.notna(rxn_b_val) and rxn_b_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
-        race_b_txt = f"{race_b_val:.3f} s" if (pd.notna(race_b_val) and race_b_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
+        if is_solo_h2h:
+            solo_rows_html = []
+            for r in h2h_table_rows:
+                solo_rows_html.append(f"""<tr>
+                    <td style="font-weight: 700; color: #FFFFFF; padding: 12px 16px;">{r['race']}</td>
+                    <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['rxn_a_str']}</td>
+                    <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['race_a_str']}</td>
+                    <td style="text-align: center; font-weight: 800; color: #00F0FF; padding: 12px;">{r['tot_a_str']}</td>
+                </tr>""")
 
-        # Render Slide 3 Table
-        h2h_rows_html = []
-        for r in h2h_table_rows:
-            h2h_rows_html.append(f"""<tr>
-                <td style="font-weight: 700; color: #FFFFFF; padding: 12px 16px;">{r['race']}</td>
-                <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['rxn_a_str']}</td>
-                <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['race_a_str']}</td>
-                <td style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); font-weight: 800; color: #00F0FF; padding: 12px;">{r['tot_a_str']}</td>
-                <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['rxn_b_str']}</td>
-                <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['race_b_str']}</td>
-                <td style="text-align: center; font-weight: 800; color: #FF8A00; padding: 12px;">{r['tot_b_str']}</td>
-            </tr>""")
+            h2h_table_html = f"""<table class="sr-pptx-table" style="width: 100%; max-width: 780px; margin: 20px auto 16px auto; border-collapse: separate; border-spacing: 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(18, 12, 36, 0.85);">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="vertical-align: middle; width: 22%; padding: 14px 16px;">Carrera</th>
+                        <th colspan="3" style="text-align: center; background: rgba(0, 240, 255, 0.15); color: #00F0FF; padding: 12px; font-size: 16px;">
+                            {team_badge(team_a, height=28)}
+                        </th>
+                    </tr>
+                    <tr>
+                        <th style="font-size: 13px; text-align: center; padding: 10px;">T. Reacción</th>
+                        <th style="font-size: 13px; text-align: center; padding: 10px;">T. Carrera</th>
+                        <th style="font-size: 13px; text-align: center; padding: 10px; color: #00F0FF;">T. Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {"".join(solo_rows_html)}
+                </tbody>
+                <tfoot>
+                    <tr style="background: rgba(255, 255, 255, 0.04); border-top: 2px solid rgba(255, 42, 133, 0.4);">
+                        <td style="font-weight: 800; color: #FFFFFF; padding: 12px 16px; font-size: 13px;">⭐ Mejor T. Reacción</td>
+                        <td style="text-align: center; font-weight: 800; color: #00F0FF; padding: 12px;">{rxn_a_txt}</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                    </tr>
+                    <tr style="background: rgba(255, 255, 255, 0.04);">
+                        <td style="font-weight: 800; color: #FFFFFF; padding: 12px 16px; font-size: 13px;">🏎️ Tiempo de Carro</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; font-weight: 800; color: #00F0FF; padding: 12px;">{car_a_txt}</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                    </tr>
+                    <tr style="background: rgba(255, 42, 133, 0.12); border-top: 1px solid rgba(255, 42, 133, 0.4);">
+                        <td style="font-weight: 900; color: #FFFFFF; padding: 12px 16px; font-size: 13px;">🚀 Mejor T. Total</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; font-weight: 900; color: #00F0FF; font-size: 15px; padding: 12px;">{tot_a_txt}</td>
+                    </tr>
+                </tfoot>
+            </table>"""
+            render_html(h2h_table_html)
 
-        h2h_table_html = f"""<table class="sr-pptx-table" style="width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(18, 12, 36, 0.85); margin: 20px 0 16px 0;">
-            <thead>
-                <tr>
-                    <th rowspan="2" style="vertical-align: middle; width: 14%; padding: 14px 16px;">Carrera</th>
-                    <th colspan="3" style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); background: rgba(0, 240, 255, 0.15); color: #00F0FF; padding: 12px; font-size: 16px;">
-                        {team_badge(team_a, height=28)}
-                    </th>
-                    <th colspan="3" style="text-align: center; background: rgba(255, 138, 0, 0.15); color: #FF8A00; padding: 12px; font-size: 16px;">
-                        {team_badge(team_b, height=28)}
-                    </th>
-                </tr>
-                <tr>
-                    <th style="font-size: 13px; text-align: center; padding: 10px;">T. Reacción</th>
-                    <th style="font-size: 13px; text-align: center; padding: 10px;">T. Carrera</th>
-                    <th style="font-size: 13px; text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); padding: 10px; color: #00F0FF;">T. Total</th>
-                    <th style="font-size: 13px; text-align: center; padding: 10px;">T. Reacción</th>
-                    <th style="font-size: 13px; text-align: center; padding: 10px;">T. Carrera</th>
-                    <th style="font-size: 13px; text-align: center; padding: 10px; color: #FF8A00;">T. Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {"".join(h2h_rows_html)}
-            </tbody>
-            <tfoot>
-                <tr style="background: rgba(255, 255, 255, 0.04); border-top: 2px solid rgba(255, 42, 133, 0.4);">
-                    <td style="font-weight: 800; color: #FFFFFF; padding: 12px 16px; font-size: 13px;">⭐ Mejor T. Reacción</td>
-                    <td style="text-align: center; font-weight: 800; color: #00F0FF; padding: 12px;">{rxn_a_txt}</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; font-weight: 800; color: #FF8A00; padding: 12px;">{rxn_b_txt}</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                </tr>
-                <tr style="background: rgba(255, 255, 255, 0.04);">
-                    <td style="font-weight: 800; color: #FFFFFF; padding: 12px 16px; font-size: 13px;">🏎️ Tiempo de Carro</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; font-weight: 800; color: #00F0FF; padding: 12px;">{car_a_txt}</td>
-                    <td style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; font-weight: 800; color: #FF8A00; padding: 12px;">{car_b_txt}</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                </tr>
-                <tr style="background: rgba(255, 42, 133, 0.12); border-top: 1px solid rgba(255, 42, 133, 0.4);">
-                    <td style="font-weight: 900; color: #FFFFFF; padding: 12px 16px; font-size: 13px;">🚀 Mejor T. Total</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); font-weight: 900; color: #00F0FF; font-size: 15px; padding: 12px;">{tot_a_txt}</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
-                    <td style="text-align: center; font-weight: 900; color: #FF8A00; font-size: 15px; padding: 12px;">{tot_b_txt}</td>
-                </tr>
-            </tfoot>
-        </table>"""
-        render_html(h2h_table_html)
-
-        # Highlight summary cards for each team right below the matchup table
-        h2h_cards_html = f"""
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-            <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 12px; padding: 16px 20px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                    <span style="font-size: 18px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=30)}</span>
-                    <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
-                    <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
-                        <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
-                        <div style="font-size: 15px; font-weight: 900; color: #FFFFFF; margin-top: 4px;">{rxn_a_txt}</div>
+            h2h_cards_html = f"""
+            <div style="max-width: 540px; margin: 0 auto 24px auto;">
+                <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 12px; padding: 16px 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <span style="font-size: 18px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=30)}</span>
+                        <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos (Individual)</span>
                     </div>
-                    <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
-                        <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
-                        <div style="font-size: 15px; font-weight: 900; color: #009FE3; margin-top: 4px;">{car_a_txt}</div>
-                    </div>
-                    <div style="background: rgba(0, 159, 227, 0.14); border: 1px solid #009FE3; border-radius: 8px; padding: 10px 6px;">
-                        <div style="font-size: 11px; color: #009FE3; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
-                        <div style="font-size: 16px; font-weight: 900; color: #009FE3; margin-top: 4px;">{tot_a_txt}</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
+                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #FFFFFF; margin-top: 4px;">{rxn_a_txt}</div>
+                        </div>
+                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
+                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #009FE3; margin-top: 4px;">{car_a_txt}</div>
+                        </div>
+                        <div style="background: rgba(0, 159, 227, 0.14); border: 1px solid #009FE3; border-radius: 8px; padding: 10px 6px;">
+                            <div style="font-size: 11px; color: #009FE3; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
+                            <div style="font-size: 16px; font-weight: 900; color: #009FE3; margin-top: 4px;">{tot_a_txt}</div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(237, 109, 5, 0.4); border-radius: 12px; padding: 16px 20px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                    <span style="font-size: 18px; font-weight: 900; color: #ED6D05;">{team_badge(team_b, height=30)}</span>
-                    <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
+            """
+            render_html(h2h_cards_html)
+        else:
+            sum_h2h_b = df_teams_summary[df_teams_summary['team'] == team_b].iloc[0] if (df_teams_summary is not None and not df_teams_summary[df_teams_summary['team'] == team_b].empty) else None
+            tot_b_val = sum_h2h_b['min_total_time'] if sum_h2h_b is not None else None
+            car_b_val = sum_h2h_b['avg_race_time'] if sum_h2h_b is not None else None
+            rxn_b_val = sum_h2h_b['min_rxn_time'] if sum_h2h_b is not None else None
+
+            tot_b_txt = f"{tot_b_val:.3f} s" if (pd.notna(tot_b_val) and tot_b_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
+            car_b_txt = f"{car_b_val:.3f} s" if (pd.notna(car_b_val) and car_b_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
+            rxn_b_txt = f"{rxn_b_val:.3f} s" if (pd.notna(rxn_b_val) and rxn_b_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
+
+            # Render Slide 3 Table
+            h2h_rows_html = []
+            for r in h2h_table_rows:
+                h2h_rows_html.append(f"""<tr>
+                    <td style="font-weight: 700; color: #FFFFFF; padding: 12px 16px;">{r['race']}</td>
+                    <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['rxn_a_str']}</td>
+                    <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['race_a_str']}</td>
+                    <td style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); font-weight: 800; color: #00F0FF; padding: 12px;">{r['tot_a_str']}</td>
+                    <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['rxn_b_str']}</td>
+                    <td style="text-align: center; color: #E6E4F0; padding: 12px;">{r['race_b_str']}</td>
+                    <td style="text-align: center; font-weight: 800; color: #FF8A00; padding: 12px;">{r['tot_b_str']}</td>
+                </tr>""")
+
+            h2h_table_html = f"""<table class="sr-pptx-table" style="width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(18, 12, 36, 0.85); margin: 20px 0 16px 0;">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="vertical-align: middle; width: 14%; padding: 14px 16px;">Carrera</th>
+                        <th colspan="3" style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); background: rgba(0, 240, 255, 0.15); color: #00F0FF; padding: 12px; font-size: 16px;">
+                            {team_badge(team_a, height=28)}
+                        </th>
+                        <th colspan="3" style="text-align: center; background: rgba(255, 138, 0, 0.15); color: #FF8A00; padding: 12px; font-size: 16px;">
+                            {team_badge(team_b, height=28)}
+                        </th>
+                    </tr>
+                    <tr>
+                        <th style="font-size: 13px; text-align: center; padding: 10px;">T. Reacción</th>
+                        <th style="font-size: 13px; text-align: center; padding: 10px;">T. Carrera</th>
+                        <th style="font-size: 13px; text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); padding: 10px; color: #00F0FF;">T. Total</th>
+                        <th style="font-size: 13px; text-align: center; padding: 10px;">T. Reacción</th>
+                        <th style="font-size: 13px; text-align: center; padding: 10px;">T. Carrera</th>
+                        <th style="font-size: 13px; text-align: center; padding: 10px; color: #FF8A00;">T. Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {"".join(h2h_rows_html)}
+                </tbody>
+                <tfoot>
+                    <tr style="background: rgba(255, 255, 255, 0.04); border-top: 2px solid rgba(255, 42, 133, 0.4);">
+                        <td style="font-weight: 800; color: #FFFFFF; padding: 12px 16px; font-size: 13px;">⭐ Mejor T. Reacción</td>
+                        <td style="text-align: center; font-weight: 800; color: #00F0FF; padding: 12px;">{rxn_a_txt}</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; font-weight: 800; color: #FF8A00; padding: 12px;">{rxn_b_txt}</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                    </tr>
+                    <tr style="background: rgba(255, 255, 255, 0.04);">
+                        <td style="font-weight: 800; color: #FFFFFF; padding: 12px 16px; font-size: 13px;">🏎️ Tiempo de Carro</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; font-weight: 800; color: #00F0FF; padding: 12px;">{car_a_txt}</td>
+                        <td style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; font-weight: 800; color: #FF8A00; padding: 12px;">{car_b_txt}</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                    </tr>
+                    <tr style="background: rgba(255, 42, 133, 0.12); border-top: 1px solid rgba(255, 42, 133, 0.4);">
+                        <td style="font-weight: 900; color: #FFFFFF; padding: 12px 16px; font-size: 13px;">🚀 Mejor T. Total</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); font-weight: 900; color: #00F0FF; font-size: 15px; padding: 12px;">{tot_a_txt}</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; color: #6C6885; padding: 12px;">---</td>
+                        <td style="text-align: center; font-weight: 900; color: #FF8A00; font-size: 15px; padding: 12px;">{tot_b_txt}</td>
+                    </tr>
+                </tfoot>
+            </table>"""
+            render_html(h2h_table_html)
+
+            # Highlight summary cards for each team right below the matchup table
+            h2h_cards_html = f"""
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 12px; padding: 16px 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <span style="font-size: 18px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=30)}</span>
+                        <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
+                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #FFFFFF; margin-top: 4px;">{rxn_a_txt}</div>
+                        </div>
+                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
+                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #009FE3; margin-top: 4px;">{car_a_txt}</div>
+                        </div>
+                        <div style="background: rgba(0, 159, 227, 0.14); border: 1px solid #009FE3; border-radius: 8px; padding: 10px 6px;">
+                            <div style="font-size: 11px; color: #009FE3; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
+                            <div style="font-size: 16px; font-weight: 900; color: #009FE3; margin-top: 4px;">{tot_a_txt}</div>
+                        </div>
+                    </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
-                    <div style="background: rgba(237, 109, 5, 0.06); border: 1px solid rgba(237, 109, 5, 0.2); border-radius: 8px; padding: 10px 6px;">
-                        <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
-                        <div style="font-size: 15px; font-weight: 900; color: #FFFFFF; margin-top: 4px;">{rxn_b_txt}</div>
+                <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(237, 109, 5, 0.4); border-radius: 12px; padding: 16px 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <span style="font-size: 18px; font-weight: 900; color: #ED6D05;">{team_badge(team_b, height=30)}</span>
+                        <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
                     </div>
-                    <div style="background: rgba(237, 109, 5, 0.06); border: 1px solid rgba(237, 109, 5, 0.2); border-radius: 8px; padding: 10px 6px;">
-                        <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
-                        <div style="font-size: 15px; font-weight: 900; color: #ED6D05; margin-top: 4px;">{car_b_txt}</div>
-                    </div>
-                    <div style="background: rgba(237, 109, 5, 0.14); border: 1px solid #ED6D05; border-radius: 8px; padding: 10px 6px;">
-                        <div style="font-size: 11px; color: #ED6D05; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
-                        <div style="font-size: 16px; font-weight: 900; color: #ED6D05; margin-top: 4px;">{tot_b_txt}</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                        <div style="background: rgba(237, 109, 5, 0.06); border: 1px solid rgba(237, 109, 5, 0.2); border-radius: 8px; padding: 10px 6px;">
+                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #FFFFFF; margin-top: 4px;">{rxn_b_txt}</div>
+                        </div>
+                        <div style="background: rgba(237, 109, 5, 0.06); border: 1px solid rgba(237, 109, 5, 0.2); border-radius: 8px; padding: 10px 6px;">
+                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #ED6D05; margin-top: 4px;">{car_b_txt}</div>
+                        </div>
+                        <div style="background: rgba(237, 109, 5, 0.14); border: 1px solid #ED6D05; border-radius: 8px; padding: 10px 6px;">
+                            <div style="font-size: 11px; color: #ED6D05; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
+                            <div style="font-size: 16px; font-weight: 900; color: #ED6D05; margin-top: 4px;">{tot_b_txt}</div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        """
-        render_html(h2h_cards_html)
+            """
+            render_html(h2h_cards_html)
 
         # Tab 2 content complete - no comparison charts as requested
 
