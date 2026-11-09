@@ -1,92 +1,58 @@
 # STEM Racing Results Visualizer 🏎️🏁
 
-Visualizador interactivo desarrollado en **Python Streamlit** para el análisis, cálculo y presentación de resultados de competencias **STEM Racing (F1 in Schools)**.
+Visualizador interactivo en tiempo real desarrollado en **Python Streamlit** para el registro de tiempos en pista, clasificación oficial y ceremonia de podio de competencias **STEM Racing (F1 in Schools)**.
 
-El sistema procesa automáticamente los datos del archivo Excel (`Racing Score Calculator.xlsx`) y reproduce cada diapositiva del archivo de diseño (`Mockups.pptx`) como una pestaña interactiva dedicada.
+Cumple con el reglamento oficial **STEM Racing Competition Regulations (C9.5 – C9.8)** y los lineamientos de marca **STEM Racing Brand Guidelines V1.3**.
 
 ---
 
 ## 🚀 Cómo Iniciar la Aplicación
 
-Para ejecutar la aplicación localmente:
-
-```bash
-# 1. Activar el entorno virtual
-source .venv/bin/activate
+```powershell
+# 1. Activar el entorno virtual (Windows PowerShell)
+.\.venv\Scripts\Activate.ps1
 
 # 2. Iniciar Streamlit
 streamlit run app.py
 ```
 
-La aplicación se abrirá en tu navegador en: **`http://localhost:8501`**.
+La aplicación estará disponible en: **`http://localhost:8501`**.
 
 ---
 
-## 📑 Estructura de Pestañas (Correspondencia con `Mockups.pptx`)
+## 🧭 Pantallas Principales
 
-| Pestaña en Streamlit | Diapositiva Mockup | Descripción y Funcionalidad |
-| :--- | :--- | :--- |
-| **🏁 Slide 1: Fastest Cars Broadcast** | Diapositiva 1 | Tabla de clasificación estilo transmisión televisiva del *Aramco STEM Racing World Finals* con deltas (+0.xxx s), insignias de bandera a cuadros y filtros de búsqueda en vivo. |
-| **⏱️ Slide 2: Tiempos Más Rápidos** | Diapositiva 2 | Distribución en dos columnas (Equipo 1-5 a la izquierda, 6-10 a la derecha) mostrando el tiempo récord de cada equipo y barras comparativas. |
-| **⚔️ Slide 3: Duelo Cara a Cara** | Diapositiva 3 | Comparativa manga a manga (Carreras 1 a 4) entre dos equipos seleccionables con tiempos de reacción, tiempos de pista y tiempos totales, resaltando al ganador de cada manga. |
-| **🏎️ Slide 4: Mejores Tiempos de Carrera** | Diapositiva 4 | Tabla del TOP 3 y clasificación completa basada en el promedio de los 2 tiempos intermedios de pista (Col G de Excel) y cálculo oficial de puntos (Col L). |
-| **🚀 Slide 5: Mejores Tiempos de Carro** | Diapositiva 5 | Tabla del TOP 3 y clasificación completa basada en el tiempo total más rápido (Col H de Excel) y cálculo oficial de puntos (Col S). |
-| **🥉 Slide 6: 3er Lugar** | Diapositiva 6 | Ficha de revelación de medalla de bronce con desglose en dos tablas de las 6 categorías evaluadas y gráfico de radar de rendimiento. |
-| **🥈 Slide 7: 2do Lugar** | Diapositiva 7 | Ficha de revelación de medalla de plata con desglose de puntaje y gráfico de radar. |
-| **🥇 Slide 8: 1er Lugar** | Diapositiva 8 | Ficha de revelación del Campeón con medalla de oro, puntaje acumulado y efectos de celebración. |
-| **🏆 Slide 9: Podio Oficial** | Diapositiva 9 | Podio 3D olímpico interactivo (1er, 2do y 3er lugar), tabla oficial del podio, clasificación general completa y botón interactivo de fanfarria/confeti. |
+### 1. ⏱️ Tiempos y Resultados en Pista
+Consta de 4 pestañas de visualización sincronizadas automáticamente cada segundo:
+* **⏱️ Tiempos por Equipos:** Tabla a dos columnas en orden oficial (`Equipos.csv`) mostrando el **Mejor Tiempo Total** y el **Tiempo de Carro** de cada equipo.
+* **⚔️ Duelos Cara a Cara:** Comparativa manga a manga (Carreras 1 a 4) para cada uno de los 5 enfrentamientos oficiales, incluyendo tiempos de reacción, pista, total y tarjetas de récords.
+* **🏎️ Tiempo de Carro (C9.6 Time Trial):** Clasificación ordenada por el promedio del 2do y 3er mejor tiempo de pista (con regla oficial de reemplazo por DNF) y diferencia (`+0.xxx s`) respecto al líder.
+* **🚀 Tiempo Más Rápido (C9.5 Reaction Race):** Clasificación ordenada por el tiempo total más rápido (reacción + pista) y diferencia respecto al líder.
 
----
+### 2. 🏆 Ceremonia de Podio Oficial
+Presentación animada paso a paso libre de distracciones:
+* **Paso 0 (Intro):** Resumen del campeonato (990 puntos máximos en las 6 áreas oficiales).
+* **Pasos 1 a 3 (3er, 2do y 1er Lugar):** Revelación progresiva que muestra primero los puntajes en las 6 categorías y finalmente revela con animación al equipo ganador y su puntaje acumulado.
+* **Paso 4 (Podio Completo):** Pedestales 3D para el Top 3 y tablas clasificatorias para las posiciones **#4 a #10**.
 
-## 📐 Lógica de Cálculos (Hojas de Excel)
-
-### 1. Datos sin procesar (Columnas A a D)
-* **Columna A:** Nombre del equipo (`Team 1`, `Team 2`, ...). Cada equipo corre 4 mangas.
-* **Columna B:** Tiempo de Reacción del piloto (segundos).
-* **Columna C:** Tiempo de Pista / Carrera del coche (segundos).
-* **Columna D:** Tiempo Total ($D = B + C$).
-
-### 2. Organización de Datos (Columnas E a H)
-* **Columna E:** Tiempos de carrera ordenados de menor a mayor (`SORT(C3:C6)`).
-* **Columna F:** Tiempos totales ordenados de menor a mayor (`SORT(D3:D6)`).
-* **Columna G (Tiempo Promedio de Carrera):** Promedio de los dos tiempos intermedios:
-  $$\text{Promedio} = \frac{E_2 + E_3}{2} = \text{AVERAGE}(E4:E5)$$
-  *(Descarta el tiempo más rápido y el más lento para medir consistencia).*
-* **Columna H (Tiempo Total Más Rápido):** Menor tiempo total entre las 4 mangas:
-  $$\text{Mínimo Total} = \min(D_1, D_2, D_3, D_4)$$
-
-### 3. Mejores Tiempos de Carrera y Puntos (Columnas J a M)
-* **Columna J:** Tiempos promedio (Col G) ordenados ascendentemente.
-* **Columna K:** Equipo correspondiente (`XLOOKUP`).
-* **Columna M (Tiempo Base $M3$):** 115% del tiempo del 3er lugar ($M3 = J5 \times 1.15$).
-* **Columna L (Puntos):**
-  * 1er Lugar: **110 puntos**
-  * 2do Lugar: **105 puntos**
-  * 3er Lugar: **100 puntos**
-  * 4to Lugar en adelante:
-    $$\text{Puntos} = \begin{cases} 20 & \text{si } Tiempo > M3 \\ \text{ROUND}\left(20 + \frac{80}{M3 - J5} \times (M3 - Tiempo)\right) & \text{si } Tiempo \le M3 \end{cases}$$
-
-### 4. Mejores Tiempos de Carro y Puntos (Columnas Q a T)
-* **Columna Q:** Tiempos totales más rápidos (Col H) ordenados ascendentemente.
-* **Columna R:** Equipo correspondiente (`XLOOKUP`).
-* **Columna T (Tiempo Base $T3$):** 120% del tiempo del 3er lugar ($T3 = Q5 \times 1.20$).
-* **Columna S (Puntos):**
-  * 1er Lugar: **110 puntos**
-  * 2do Lugar: **105 puntos**
-  * 3er Lugar: **100 puntos**
-  * 4to Lugar en adelante:
-    $$\text{Puntos} = \begin{cases} 5 & \text{si } Tiempo > T3 \\ \text{ROUND}\left(5 + \frac{95}{T3 - Q3} \times (T3 - Tiempo)\right) & \text{si } Tiempo \le T3 \end{cases}$$
+### 3. 📝 Pantalla de Edición y Registro
+* Registro en vivo por enfrentamiento oficial (1 vs 2, 3 vs 4, 5 vs 6, 7 vs 8, 9 vs 10) y número de carrera (1 a 4).
+* Casillas para marcar **❌ DNF** (C9.7) y **🚦 False Start** (C9.8).
+* **🎲 Test Mode:** Generador de datos de prueba aleatorios por carrera.
+* **📋 Monitor General del Torneo:** Vista consolidada de los 10 equipos y sus 4 carreras.
+* **🕒 Historial de Registros CSV y Editor de Grilla:** Registro auditable (`live_race_data.csv`) con `id` secuencial y `timestamp`.
 
 ---
 
-## 🎨 Personalización y Carga de Nuevos Archivos
+## 📝 Carga de Puntajes de Jueces (`STEM RACING - COMPETITION JUDGING BREAKDOWN`)
 
-* **Carga de Archivos:** Puedes arrastrar y soltar cualquier nuevo archivo `.xlsx` desde la barra lateral.
-* **Edición de Rúbricas:** Desde el menú desplegable en la barra lateral puedes ajustar las calificaciones de los jueces en las 6 categorías evaluadas:
-  1. Identidad de Marca
-  2. Presentación Verbal
-  3. Carrera (calculada automáticamente de la pista)
-  4. Especificaciones y Escrutinio
-  5. Diseño e Ingeniería
-  6. Gestión de Proyecto
-* El podio final y las fichas de los lugares 1, 2 y 3 se actualizarán instantáneamente con los nuevos totales.
+Desde la barra lateral (**📝 Rúbrica de Jueces**), puedes subir uno o múltiples archivos `.xlsx` o `.csv` con el formato oficial **`STEM RACING - COMPETITION JUDGING BREAKDOWN`**:
+* Identifica automáticamente al equipo por `Team Name:`, `Team Number:` (01–10), `School:` o nombre de archivo.
+* Extrae los puntos otorgados (`Awarded Points`) en las 5 categorías evaluadas por jueces (770 pts máx.):
+  1. **Especificaciones y Escrutinio** (`Specification and Scrutineering Judging` — máx. 170 pts)
+  2. **Diseño e Ingeniería** (`Design and Engineering Judging` — máx. 180 pts)
+  3. **Gestión de Proyecto** (`Enterprise Judging` — máx. 160 pts)
+  4. **Presentación Verbal** (`Verbal Presentation Judging` — máx. 160 pts)
+  5. **Identidad de Marca** (`Brand Identity Judging` — máx. 100 pts)
+* Incluye respaldo automático leyendo sub-categorías y hojas de *Scorecards* individuales si el archivo `.xlsx` contiene fórmulas sin caché.
+* Los puntajes cargados o editados manualmente se guardan automáticamente en `judge_scores.csv`.

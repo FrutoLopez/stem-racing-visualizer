@@ -12,14 +12,9 @@ from datetime import datetime
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
 
-import importlib
 import data_processor as dp
 import styles
-importlib.reload(dp)
-importlib.reload(styles)
 
 # Page Configuration
 st.set_page_config(
@@ -59,6 +54,7 @@ ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 LOGO_PATH = os.path.join(ASSETS_DIR, "logo.png")
 TEAMS_CSV_PATH = os.path.join(os.path.dirname(__file__), "Equipos.csv")
 LIVE_CSV_PATH = os.path.join(os.path.dirname(__file__), "live_race_data.csv")
+JUDGE_CSV_PATH = os.path.join(os.path.dirname(__file__), "judge_scores.csv")
 
 logo_b64 = styles.get_base64_encoded_image(LOGO_PATH)
 team_logos_b64 = styles.load_team_logos_b64(ASSETS_DIR)
@@ -135,12 +131,15 @@ def get_shared_race_store():
         hist_df = pd.DataFrame(columns=dp.CSV_SCHEMA)
         initial_df = pd.DataFrame(columns=RUNS_SCHEMA)
     mtime = os.path.getmtime(LIVE_CSV_PATH) if os.path.exists(LIVE_CSV_PATH) else 0.0
+    judge_mtime = os.path.getmtime(JUDGE_CSV_PATH) if os.path.exists(JUDGE_CSV_PATH) else 0.0
+    persisted_judges = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, {})
     return {
         "version": 1,
         "history_df": hist_df,
         "runs_df": initial_df,
-        "custom_scores": None,
+        "custom_scores": persisted_judges,
         "csv_mtime": mtime,
+        "judge_csv_mtime": judge_mtime,
     }
 
 
@@ -154,7 +153,7 @@ elif not shared_store["history_df"].empty and "team" in shared_store["history_df
         shared_store["runs_df"] = normalize_runs_df(shared_store["history_df"])
         shared_store["version"] += 1
 
-# Check if CSV file was updated externally on disk
+# Check if CSV files were updated externally on disk
 if os.path.exists(LIVE_CSV_PATH):
     try:
         disk_mtime = os.path.getmtime(LIVE_CSV_PATH)
@@ -164,6 +163,18 @@ if os.path.exists(LIVE_CSV_PATH):
             shared_store["runs_df"] = normalize_runs_df(hist_df)
             shared_store["csv_mtime"] = disk_mtime
             shared_store["version"] += 1
+    except Exception:
+        pass
+
+if os.path.exists(JUDGE_CSV_PATH):
+    try:
+        j_mtime = os.path.getmtime(JUDGE_CSV_PATH)
+        if j_mtime > shared_store.get("judge_csv_mtime", 0.0) + 0.05:
+            loaded_j = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, {})
+            if loaded_j is not None:
+                shared_store["custom_scores"] = loaded_j
+                shared_store["judge_csv_mtime"] = j_mtime
+                shared_store["version"] += 1
     except Exception:
         pass
 
@@ -201,10 +212,10 @@ def clear_all_records() -> None:
     st.session_state["_last_active_form_ctx"] = None
 
 
-def commit_runs_df(new_df: pd.DataFrame) -> pd.DataFrame:
+def commit_runs_df(new_df: pd.DataFrame, recalculate_totals: bool = True) -> pd.DataFrame:
     """Save full grid edits to CSV (with id and timestamp) and broadcast to all connected visualizers."""
-    dp.save_runs_to_csv(new_df, LIVE_CSV_PATH)
-    hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH)
+    dp.save_runs_to_csv(new_df, LIVE_CSV_PATH, recalculate_totals=recalculate_totals)
+    hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH, recalculate_totals=recalculate_totals)
     cleaned = normalize_runs_df(hist_df)
     shared_store["history_df"] = hist_df.copy()
     shared_store["runs_df"] = cleaned.copy()
@@ -216,6 +227,24 @@ def commit_runs_df(new_df: pd.DataFrame) -> pd.DataFrame:
     st.session_state.local_store_version = shared_store["version"]
     st.session_state["_last_active_form_ctx"] = None
     return cleaned
+
+
+def save_and_sync_judge_scores(scores_df: pd.DataFrame, racing_pts_map: dict) -> pd.DataFrame:
+    """Recalculate championship totals/ranks, persist judge scores to disk, and sync shared store."""
+    updated = scores_df.copy()
+    updated['Carrera'] = updated['team'].map(racing_pts_map).fillna(0.0)
+    cat_cols = [c for c in dp.DEFAULT_CATEGORIES if c in updated.columns]
+    updated['Total'] = updated[cat_cols].sum(axis=1).round(2)
+    updated = updated.sort_values(by='Total', ascending=False).reset_index(drop=True)
+    updated['rank'] = updated.index + 1
+    dp.save_judge_scores_to_csv(updated, JUDGE_CSV_PATH)
+    if os.path.exists(JUDGE_CSV_PATH):
+        shared_store["judge_csv_mtime"] = os.path.getmtime(JUDGE_CSV_PATH)
+    shared_store["custom_scores"] = updated.copy()
+    shared_store["version"] += 1
+    st.session_state.custom_scores = updated.copy()
+    st.session_state.local_store_version = shared_store["version"]
+    return updated
 
 
 @st.fragment(run_every=1.0)
@@ -233,6 +262,17 @@ def live_visualizer_sync_watcher():
                 store["runs_df"] = normalize_runs_df(hist_df)
                 store["csv_mtime"] = curr_mtime
                 store["version"] += 1
+        except Exception:
+            pass
+    if os.path.exists(JUDGE_CSV_PATH):
+        try:
+            curr_j_mtime = os.path.getmtime(JUDGE_CSV_PATH)
+            if curr_j_mtime > store.get("judge_csv_mtime", 0.0) + 0.05:
+                loaded_j = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, {})
+                if loaded_j is not None:
+                    store["custom_scores"] = loaded_j
+                    store["judge_csv_mtime"] = curr_j_mtime
+                    store["version"] += 1
         except Exception:
             pass
     if st.session_state.get("local_store_version", -1) != store["version"]:
@@ -268,8 +308,36 @@ if "_pending_view_mode" in st.session_state and st.session_state._pending_view_m
 # Current runs dataframe
 df_runs = st.session_state.runs_df.copy() if st.session_state.runs_df is not None else pd.DataFrame(columns=RUNS_SCHEMA)
 
-# Check race progress (all teams have 4 races)
-is_auto_culminated, done_cnt, exp_cnt = dp.check_races_culminated(df_runs, official_teams)
+# ==============================================================================
+# AUTOMATIC REAL-TIME CALCULATIONS (220 PTS RACING SUM FOR PODIUM)
+# ==============================================================================
+calc_results = dp.calculate_racing_results(df_runs, all_teams=official_teams, award_points=True)
+df_teams_summary = calc_results['teams_summary']
+df_race_lb = calc_results['race_leaderboard']
+df_total_lb = calc_results['total_leaderboard']
+base_race_time = calc_results['base_race_time']
+base_total_time = calc_results['base_total_time']
+
+# Racing score for General Championship is ALWAYS the sum of Tiempo de Carro (110 pts) + Tiempo Más Rápido (110 pts) = 220 pts max
+pts_race_map = dict(zip(df_race_lb['team'], df_race_lb['points']))
+pts_tot_map = dict(zip(df_total_lb['team'], df_total_lb['points']))
+racing_pts_map = {t: float(pts_race_map.get(t, 0.0) + pts_tot_map.get(t, 0.0)) for t in official_teams}
+
+# Manage Judge category scores for Championship Podio
+if st.session_state.custom_scores is None or set(st.session_state.custom_scores['team']) != set(official_teams):
+    loaded_from_disk = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, racing_pts_map)
+    if loaded_from_disk is not None:
+        st.session_state.custom_scores = loaded_from_disk
+    else:
+        st.session_state.custom_scores = dp.get_default_category_scores(official_teams, racing_pts_map)
+    shared_store["custom_scores"] = st.session_state.custom_scores.copy()
+else:
+    st.session_state.custom_scores['Carrera'] = st.session_state.custom_scores['team'].map(racing_pts_map).fillna(0.0)
+    cat_cols = [c for c in dp.DEFAULT_CATEGORIES if c in st.session_state.custom_scores.columns]
+    st.session_state.custom_scores['Total'] = st.session_state.custom_scores[cat_cols].sum(axis=1).round(2)
+    st.session_state.custom_scores = st.session_state.custom_scores.sort_values(by='Total', ascending=False).reset_index(drop=True)
+    st.session_state.custom_scores['rank'] = st.session_state.custom_scores.index + 1
+    shared_store["custom_scores"] = st.session_state.custom_scores.copy()
 
 # ==============================================================================
 # SIDEBAR CONTROLS
@@ -335,14 +403,35 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### 📝 Rúbrica de Jueces")
-    uploaded_rubric = st.file_uploader(
-        "Subir Archivo de Rúbrica:",
-        type=["csv", "xlsx"],
+    uploaded_rubric_files = st.file_uploader(
+        "Subir Archivo(s) de Evaluación (.xlsx / .csv):",
+        type=["xlsx", "csv"],
+        accept_multiple_files=True,
         key="rubric_file_uploader",
-        help="Sube un archivo CSV o Excel con los puntajes de las categorías de jueces (modo dummy de referencia)."
+        help="Sube uno o varios archivos Excel/CSV de evaluación ('STEM RACING - COMPETITION JUDGING BREAKDOWN') por equipo o tabla resumen."
     )
-    if uploaded_rubric is not None:
-        st.success(f"📁 Archivo recibido: {uploaded_rubric.name}")
+    if uploaded_rubric_files:
+        rubric_sig = "|".join(f"{f.name}_{f.size}" for f in uploaded_rubric_files)
+        auto_load_rubric = st.session_state.get("_last_uploaded_rubric_sig") != rubric_sig
+        reload_rubric_btn = st.button("🔄 Recargar Puntajes de Archivo(s)", use_container_width=True, key="reload_rubric_btn")
+        if auto_load_rubric or reload_rubric_btn:
+            parsed_scores, parse_msgs = dp.parse_judging_rubric_files(uploaded_rubric_files, official_teams)
+            st.session_state["_last_uploaded_rubric_msgs"] = parse_msgs
+            st.session_state["_last_uploaded_rubric_sig"] = rubric_sig
+            if parsed_scores and st.session_state.custom_scores is not None:
+                for t_name, cat_vals in parsed_scores.items():
+                    t_mask = st.session_state.custom_scores['team'] == t_name
+                    if t_mask.any():
+                        for cat_col, val in cat_vals.items():
+                            st.session_state.custom_scores.loc[t_mask, cat_col] = val
+                save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
+                st.toast(f"✅ Puntajes de jueces cargados para {len(parsed_scores)} equipo(s).")
+                st.rerun()
+        for msg in st.session_state.get("_last_uploaded_rubric_msgs", []):
+            st.caption(msg)
+    else:
+        st.session_state["_last_uploaded_rubric_sig"] = None
+        st.session_state["_last_uploaded_rubric_msgs"] = []
 
     with st.expander("✏️ Editar Puntajes de Jueces Manualmente"):
         st.caption("Ajusta los puntajes evaluados por los jueces para el Podio General:")
@@ -353,44 +442,19 @@ with st.sidebar:
                 use_container_width=True,
                 key="rubric_editor"
             )
-            if st.button("Guardar Puntajes de Jueces", use_container_width=True):
-                for col in ['Identidad de Marca', 'Presentación Verbal', 'Especificaciones y Escrutinio', 'Diseño e Ingeniería', 'Gestión de Proyecto']:
-                    st.session_state.custom_scores[col] = edited_rubric[col]
-                st.session_state.custom_scores['Total'] = st.session_state.custom_scores[dp.DEFAULT_CATEGORIES].sum(axis=1)
-                st.session_state.custom_scores = st.session_state.custom_scores.sort_values(by='Total', ascending=False).reset_index(drop=True)
-                st.session_state.custom_scores['rank'] = st.session_state.custom_scores.index + 1
-                shared_store["custom_scores"] = st.session_state.custom_scores.copy()
-                shared_store["version"] += 1
-                st.session_state.local_store_version = shared_store["version"]
+            if st.button("💾 Guardar Puntajes de Jueces", use_container_width=True):
+                for col in dp.NON_RACING_CATEGORIES:
+                    st.session_state.custom_scores[col] = pd.to_numeric(edited_rubric[col], errors='coerce').fillna(0.0).clip(
+                        lower=0.0, upper=float(dp.CATEGORY_MAX_POINTS.get(col, 200))
+                    )
+                save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
                 st.toast("✅ Puntajes de jueces guardados.")
                 st.rerun()
-
-# ==============================================================================
-# AUTOMATIC REAL-TIME CALCULATIONS (220 PTS RACING SUM FOR PODIUM)
-# ==============================================================================
-calc_results = dp.calculate_racing_results(df_runs, all_teams=official_teams, award_points=True)
-df_teams_summary = calc_results['teams_summary']
-df_race_lb = calc_results['race_leaderboard']
-df_total_lb = calc_results['total_leaderboard']
-base_race_time = calc_results['base_race_time']
-base_total_time = calc_results['base_total_time']
-
-# Racing score for General Championship is ALWAYS the sum of Tiempo de Carro (110 pts) + Tiempo Más Rápido (110 pts) = 220 pts max
-pts_race_map = dict(zip(df_race_lb['team'], df_race_lb['points']))
-pts_tot_map = dict(zip(df_total_lb['team'], df_total_lb['points']))
-racing_pts_map = {t: float(pts_race_map.get(t, 0.0) + pts_tot_map.get(t, 0.0)) for t in official_teams}
-
-# Manage Judge category scores for Championship Podio
-if st.session_state.custom_scores is None or set(st.session_state.custom_scores['team']) != set(official_teams):
-    st.session_state.custom_scores = dp.get_default_category_scores(official_teams, racing_pts_map)
-    shared_store["custom_scores"] = st.session_state.custom_scores.copy()
-else:
-    st.session_state.custom_scores['Carrera'] = st.session_state.custom_scores['team'].map(racing_pts_map).fillna(0.0)
-    cat_cols = [c for c in dp.DEFAULT_CATEGORIES if c in st.session_state.custom_scores.columns]
-    st.session_state.custom_scores['Total'] = st.session_state.custom_scores[cat_cols].sum(axis=1)
-    st.session_state.custom_scores = st.session_state.custom_scores.sort_values(by='Total', ascending=False).reset_index(drop=True)
-    st.session_state.custom_scores['rank'] = st.session_state.custom_scores.index + 1
-    shared_store["custom_scores"] = st.session_state.custom_scores.copy()
+            if st.button("🔄 Poner Puntajes de Jueces en 0", use_container_width=True):
+                zero_df = dp.get_default_category_scores(official_teams, racing_pts_map, zero_init=True)
+                save_and_sync_judge_scores(zero_df, racing_pts_map)
+                st.toast("🗑️ Puntajes de jueces reiniciados en 0.")
+                st.rerun()
 
 df_championship = st.session_state.custom_scores
 
@@ -421,11 +485,11 @@ def render_place_reveal_slide(rank_target: int, medal_emoji: str, title: str, ac
         <tbody>
             <tr>
                 <td style="font-weight: 700;">🎨 Identidad de Marca</td>
-                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{int(row['Identidad de Marca'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 100</span></td>
+                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{format_pts(row['Identidad de Marca'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 100</span></td>
             </tr>
             <tr>
                 <td style="font-weight: 700;">🎤 Presentación Verbal</td>
-                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{int(row['Presentación Verbal'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 160</span></td>
+                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{format_pts(row['Presentación Verbal'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 160</span></td>
             </tr>
             <tr style="background: rgba(230, 0, 122, 0.14);">
                 <td style="font-weight: 800; color: #FF2A85;">
@@ -450,15 +514,15 @@ def render_place_reveal_slide(rank_target: int, medal_emoji: str, title: str, ac
         <tbody>
             <tr>
                 <td style="font-weight: 700;">📐 Especificaciones y Escrutinio</td>
-                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{int(row['Especificaciones y Escrutinio'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 170</span></td>
+                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{format_pts(row['Especificaciones y Escrutinio'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 170</span></td>
             </tr>
             <tr>
                 <td style="font-weight: 700;">💻 Diseño e Ingeniería</td>
-                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{int(row['Diseño e Ingeniería'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 180</span></td>
+                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{format_pts(row['Diseño e Ingeniería'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 180</span></td>
             </tr>
             <tr>
                 <td style="font-weight: 700;">📊 Empresa y Gestión de Proyecto</td>
-                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{int(row['Gestión de Proyecto'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 160</span></td>
+                <td style="text-align: right; font-weight: 900; font-size: 17px; color: {accent_color};">{format_pts(row['Gestión de Proyecto'])} <span style="font-size: 12px; color: #A09EB8; font-weight: 600;">/ 160</span></td>
             </tr>
         </tbody>
     </table>"""
@@ -555,7 +619,7 @@ def render_podium_intro_slide():
 
 
 def render_podium_full_slide():
-    """Full podium presentation with 3D pedestals and positions 4-9 split side-by-side."""
+    """Full podium presentation with 3D pedestals and positions 4-10 split side-by-side."""
     if df_championship.empty:
         st.info("ℹ️ No hay datos de podio disponibles aún.")
         return
@@ -571,9 +635,9 @@ def render_podium_full_slide():
     t3_name = t3['team'] if t3 is not None else 'Equipo 3'
     t3_pts = format_pts(t3['Total']) if t3 is not None else "0"
 
-    # Positions 4-6 (Left) and 7-9 (Right), excluding position 10
+    # Positions 4-6 (Left) and 7-10 (Right)
     t4_6 = df_championship[df_championship['rank'].isin([4, 5, 6])].sort_values(by='rank')
-    t7_9 = df_championship[df_championship['rank'].isin([7, 8, 9])].sort_values(by='rank')
+    t7_10 = df_championship[df_championship['rank'].isin([7, 8, 9, 10])].sort_values(by='rank')
 
     def build_mini_table(df_subset):
         rows = []
@@ -602,7 +666,7 @@ def render_podium_full_slide():
         </table>"""
 
     table_4_6 = build_mini_table(t4_6)
-    table_7_9 = build_mini_table(t7_9)
+    table_7_10 = build_mini_table(t7_10)
 
     podium_ceremony_html = f"""
     <div key="podium-full-{st.session_state.podium_anim_nonce}">
@@ -653,14 +717,13 @@ def render_podium_full_slide():
                     {table_4_6}
                 </div>
                 <div>
-                    {table_7_9}
+                    {table_7_10}
                 </div>
             </div>
         </div>
     </div>
     """
     render_html(podium_ceremony_html)
-
 
 
 # ==============================================================================
@@ -874,11 +937,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                     t_mask = st.session_state.custom_scores['team'] == t_name
                     for cat_col, val in rnd_scores.items():
                         st.session_state.custom_scores.loc[t_mask, cat_col] = val
-                cat_cols_all = [c for c in dp.DEFAULT_CATEGORIES if c in st.session_state.custom_scores.columns]
-                st.session_state.custom_scores['Total'] = st.session_state.custom_scores[cat_cols_all].sum(axis=1).round(2)
-                st.session_state.custom_scores = st.session_state.custom_scores.sort_values(by='Total', ascending=False).reset_index(drop=True)
-                st.session_state.custom_scores['rank'] = st.session_state.custom_scores.index + 1
-                shared_store["custom_scores"] = st.session_state.custom_scores.copy()
+                save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
 
             lbl_a = "DNF" if rnd_a_dnf else ("False Start" if rnd_a_fs else f"{rnd_a_rxn + rnd_a_race:.3f}s")
             lbl_b = "DNF" if rnd_b_dnf else ("False Start" if rnd_b_fs else f"{rnd_b_rxn + rnd_b_race:.3f}s")
@@ -1231,13 +1290,13 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         col_ge_s1, col_ge_s2 = st.columns(2)
         with col_ge_s1:
             if st.button("💾 Aplicar Cambios de la Grilla y Guardar", use_container_width=True):
-                commit_runs_df(edited_data)
+                commit_runs_df(edited_data, recalculate_totals=True)
                 st.toast("✅ Cambios de grilla aplicados con éxito.")
                 st.rerun()
 
         with col_ge_s2:
             if st.button("⚡ Recalcular Tiempos Totales (Reacción + Carrera)", use_container_width=True):
-                commit_runs_df(edited_data)
+                commit_runs_df(edited_data, recalculate_totals=True)
                 st.toast("✅ Tiempos totales recalculados.")
                 st.rerun()
 
@@ -1815,4 +1874,3 @@ else:
             render_html("\n".join(tot_broadcast_rows))
 
         # Tab 4 content complete - no comparison charts as requested
-
