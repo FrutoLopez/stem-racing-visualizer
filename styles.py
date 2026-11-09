@@ -7,7 +7,13 @@ Strictly adheres to official STEM Racing Brand Guidelines (V1.3 - March 2026):
 """
 
 import base64
+from io import BytesIO
 import os
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 # ==============================================================================
 # OFFICIAL STEM RACING BRAND CONSTANTS (V1.3 Brand Guidelines)
@@ -29,10 +35,17 @@ CARD_BORDER_CYAN = "rgba(0, 159, 227, 0.40)"
 CARD_BORDER_ORANGE = "rgba(237, 109, 5, 0.40)"
 
 
-def get_base64_encoded_image(image_path: str) -> str:
-    """Read a local image and return base64 string."""
+def get_base64_encoded_image(image_path: str, max_size: tuple = (360, 180)) -> str:
+    """Read a local image, optionally downscale in memory to reduce DOM/WebSocket memory, and return base64 string."""
     if os.path.exists(image_path):
         try:
+            if Image is not None and max_size:
+                with Image.open(image_path) as img:
+                    if img.width > max_size[0] or img.height > max_size[1]:
+                        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                        buf = BytesIO()
+                        img.save(buf, format="PNG", optimize=True)
+                        return base64.b64encode(buf.getvalue()).decode()
             with open(image_path, "rb") as f:
                 data = f.read()
             return base64.b64encode(data).decode()
@@ -542,6 +555,7 @@ input:disabled, .stTextInput input:disabled, div[data-baseweb="input"] input:dis
 </style>"""
     return css
 
+
 def render_app_header(logo_b64: str = "") -> str:
     """Renders the top branding banner without any leading indentation."""
     logo_html = f'<img src="data:image/png;base64,{logo_b64}" style="height: 52px; width: auto;" alt="STEM Racing Panamá"/>' if logo_b64 else '<span style="font-size: 26px; font-weight: 900; font-style: italic; color: #ED6D05;">🏁 STEM RACING PANAMÁ</span>'
@@ -571,11 +585,11 @@ TEAM_LOGO_FILES = {
 
 
 def load_team_logos_b64(assets_dir: str) -> dict:
-    """Load base64-encoded PNG logos for all teams that have an extracted logo in assets."""
+    """Load base64-encoded PNG logos (downscaled to 132x90 max) for all teams in assets."""
     logos = {}
     for team_name, filename in TEAM_LOGO_FILES.items():
         path = os.path.join(assets_dir, filename)
-        b64 = get_base64_encoded_image(path)
+        b64 = get_base64_encoded_image(path, max_size=(132, 90))
         if b64:
             logos[team_name] = b64
     return logos
@@ -605,4 +619,3 @@ def render_team_with_logo(team_name: str, logos_b64: dict, height: int = 30, gap
     """Return an inline flex container with the team's uniform logo badge and name."""
     icon = get_team_logo_html(team_name, logos_b64, height=height)
     return f'<span style="display:inline-flex; align-items:center; gap:{gap}px; vertical-align:middle;">{icon}<span>{team_name}</span></span>'
-

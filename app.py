@@ -43,12 +43,6 @@ def format_pts(val: float) -> str:
     return f"{v:.1f}".rstrip('0').rstrip('.') if (v % 1 != 0) else f"{int(v)}"
 
 
-# Inject Custom CSS
-if hasattr(st, "html"):
-    st.html(styles.inject_custom_css())
-else:
-    st.markdown(styles.inject_custom_css(), unsafe_allow_html=True)
-
 # Assets & Paths
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 LOGO_PATH = os.path.join(ASSETS_DIR, "logo.png")
@@ -56,8 +50,25 @@ TEAMS_CSV_PATH = os.path.join(os.path.dirname(__file__), "Equipos.csv")
 LIVE_CSV_PATH = os.path.join(os.path.dirname(__file__), "live_race_data.csv")
 JUDGE_CSV_PATH = os.path.join(os.path.dirname(__file__), "judge_scores.csv")
 
-logo_b64 = styles.get_base64_encoded_image(LOGO_PATH)
-team_logos_b64 = styles.load_team_logos_b64(ASSETS_DIR)
+
+@st.cache_data(show_spinner=False)
+def load_cached_branding_and_teams():
+    """Cache CSS, downscaled base64 logos, and official teams once to avoid disk I/O & memory spikes on reruns."""
+    css_str = styles.inject_custom_css()
+    main_logo = styles.get_base64_encoded_image(LOGO_PATH, max_size=(420, 160))
+    t_logos = styles.load_team_logos_b64(ASSETS_DIR)
+    teams = dp.load_teams_from_csv(TEAMS_CSV_PATH)
+    matchups = dp.get_matchups(teams)
+    return css_str, main_logo, t_logos, teams, matchups
+
+
+custom_css_str, logo_b64, team_logos_b64, official_teams, matchups_list = load_cached_branding_and_teams()
+
+# Inject Custom CSS
+if hasattr(st, "html"):
+    st.html(custom_css_str)
+else:
+    st.markdown(custom_css_str, unsafe_allow_html=True)
 
 
 def team_badge(team_name: str, height: int = 28, gap: int = 9) -> str:
@@ -69,10 +80,6 @@ def team_logo_only(team_name: str, height: int = 34, fallback_emoji: str = "🏎
     """Render only the team logo (or fallback emoji if team has no logo)."""
     return styles.get_team_logo_html(team_name, team_logos_b64, height=height, fallback_emoji=fallback_emoji)
 
-
-# Load official teams and matchups
-official_teams = dp.load_teams_from_csv(TEAMS_CSV_PATH)
-matchups_list = dp.get_matchups(official_teams)
 
 RUNS_SCHEMA = ['team', 'race_number', 'reaction_time', 'race_time', 'total_time', 'is_dnf', 'is_false_start']
 
@@ -118,65 +125,83 @@ def normalize_runs_df(df: pd.DataFrame) -> pd.DataFrame:
 @st.cache_resource
 def get_shared_race_store():
     """Global in-memory store shared across all browser tabs/windows for real-time visualizer updates."""
-    if os.path.exists(LIVE_CSV_PATH) and os.path.getsize(LIVE_CSV_PATH) > 0:
-        try:
-            hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH)
-            # Ensure existing CSV on disk has id and timestamp columns persisted
+    with dp.CSV_LOCK:
+        hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH)
+        if hist_df is not None and not hist_df.empty:
             dp.save_runs_to_csv(hist_df, LIVE_CSV_PATH)
             initial_df = normalize_runs_df(hist_df)
-        except Exception:
+        else:
             hist_df = pd.DataFrame(columns=dp.CSV_SCHEMA)
             initial_df = pd.DataFrame(columns=RUNS_SCHEMA)
-    else:
-        hist_df = pd.DataFrame(columns=dp.CSV_SCHEMA)
-        initial_df = pd.DataFrame(columns=RUNS_SCHEMA)
-    mtime = os.path.getmtime(LIVE_CSV_PATH) if os.path.exists(LIVE_CSV_PATH) else 0.0
-    judge_mtime = os.path.getmtime(JUDGE_CSV_PATH) if os.path.exists(JUDGE_CSV_PATH) else 0.0
-    persisted_judges = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, {})
-    return {
-        "version": 1,
-        "history_df": hist_df,
-        "runs_df": initial_df,
-        "custom_scores": persisted_judges,
-        "csv_mtime": mtime,
-        "judge_csv_mtime": judge_mtime,
-    }
+        mtime = os.path.getmtime(LIVE_CSV_PATH) if os.path.exists(LIVE_CSV_PATH) else 0.0
+        judge_mtime = os.path.getmtime(JUDGE_CSV_PATH) if os.path.exists(JUDGE_CSV_PATH) else 0.0
+        persisted_judges = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, {})
+        return {
+            "version": 1,
+            "history_df": hist_df,
+            "runs_df": initial_df,
+            "custom_scores": persisted_judges,
+            "csv_mtime": mtime,
+            "judge_csv_mtime": judge_mtime,
+            "explicitly_cleared": False,
+        }
+
+
+def sync_store_from_disk_if_needed(store: dict) -> bool:
+    """
+    Safely check if CSV files on disk have newer valid data without ever wiping
+    non-empty in-memory state if a concurrent read returns empty.
+    Returns True if store was updated.
+    """
+    updated = False
+    with dp.CSV_LOCK:
+        if "history_df" not in store or store["history_df"] is None:
+            hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH)
+            store["history_df"] = hist_df
+            store["runs_df"] = normalize_runs_df(hist_df)
+            updated = True
+        elif store["history_df"].empty and not store.get("explicitly_cleared", False):
+            # If memory store appears empty on a new connection, recover from disk/.bak if records exist
+            hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH)
+            if not hist_df.empty:
+                store["history_df"] = hist_df
+                store["runs_df"] = normalize_runs_df(hist_df)
+                store["csv_mtime"] = os.path.getmtime(LIVE_CSV_PATH) if os.path.exists(LIVE_CSV_PATH) else 0.0
+                store["version"] += 1
+                updated = True
+
+        if os.path.exists(LIVE_CSV_PATH):
+            try:
+                disk_mtime = os.path.getmtime(LIVE_CSV_PATH)
+                if disk_mtime > store.get("csv_mtime", 0.0) + 0.05:
+                    hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH)
+                    # Guard against replacing non-empty store with an empty read unless explicitly cleared
+                    if not hist_df.empty or store.get("explicitly_cleared", False) or store["history_df"].empty:
+                        store["history_df"] = hist_df
+                        store["runs_df"] = normalize_runs_df(hist_df)
+                        store["csv_mtime"] = disk_mtime
+                        store["version"] += 1
+                        updated = True
+            except Exception:
+                pass
+
+        if os.path.exists(JUDGE_CSV_PATH):
+            try:
+                j_mtime = os.path.getmtime(JUDGE_CSV_PATH)
+                if j_mtime > store.get("judge_csv_mtime", 0.0) + 0.05:
+                    loaded_j = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, {})
+                    if loaded_j is not None and not loaded_j.empty:
+                        store["custom_scores"] = loaded_j
+                        store["judge_csv_mtime"] = j_mtime
+                        store["version"] += 1
+                        updated = True
+            except Exception:
+                pass
+    return updated
 
 
 shared_store = get_shared_race_store()
-if "history_df" not in shared_store or shared_store["history_df"] is None:
-    shared_store["history_df"] = dp.load_runs_from_csv(LIVE_CSV_PATH)
-elif not shared_store["history_df"].empty and "team" in shared_store["history_df"].columns:
-    if shared_store["history_df"]["team"].isin(dp.LEGACY_TEAM_MAP.keys()).any():
-        shared_store["history_df"]["team"] = shared_store["history_df"]["team"].replace(dp.LEGACY_TEAM_MAP)
-        dp.save_runs_to_csv(shared_store["history_df"], LIVE_CSV_PATH)
-        shared_store["runs_df"] = normalize_runs_df(shared_store["history_df"])
-        shared_store["version"] += 1
-
-# Check if CSV files were updated externally on disk
-if os.path.exists(LIVE_CSV_PATH):
-    try:
-        disk_mtime = os.path.getmtime(LIVE_CSV_PATH)
-        if disk_mtime > shared_store["csv_mtime"] + 0.05:
-            hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH)
-            shared_store["history_df"] = hist_df
-            shared_store["runs_df"] = normalize_runs_df(hist_df)
-            shared_store["csv_mtime"] = disk_mtime
-            shared_store["version"] += 1
-    except Exception:
-        pass
-
-if os.path.exists(JUDGE_CSV_PATH):
-    try:
-        j_mtime = os.path.getmtime(JUDGE_CSV_PATH)
-        if j_mtime > shared_store.get("judge_csv_mtime", 0.0) + 0.05:
-            loaded_j = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, {})
-            if loaded_j is not None:
-                shared_store["custom_scores"] = loaded_j
-                shared_store["judge_csv_mtime"] = j_mtime
-                shared_store["version"] += 1
-    except Exception:
-        pass
+sync_store_from_disk_if_needed(shared_store)
 
 
 def append_race_records(new_rows: list) -> pd.DataFrame:
@@ -184,97 +209,81 @@ def append_race_records(new_rows: list) -> pd.DataFrame:
     Append new or edited race records to the CSV file with a sequential `id` and `timestamp`,
     and update the active deduplicated `runs_df` for all connected visualizers.
     """
-    hist_df = dp.append_runs_to_csv(new_rows, LIVE_CSV_PATH)
-    active_df = normalize_runs_df(hist_df)
-    shared_store["history_df"] = hist_df.copy()
-    shared_store["runs_df"] = active_df.copy()
-    if os.path.exists(LIVE_CSV_PATH):
-        shared_store["csv_mtime"] = os.path.getmtime(LIVE_CSV_PATH)
-    shared_store["version"] += 1
-    st.session_state.history_df = hist_df.copy()
-    st.session_state.runs_df = active_df.copy()
-    st.session_state.local_store_version = shared_store["version"]
-    return active_df
+    with dp.CSV_LOCK:
+        hist_df = dp.append_runs_to_csv(new_rows, LIVE_CSV_PATH)
+        active_df = normalize_runs_df(hist_df)
+        shared_store["explicitly_cleared"] = False
+        shared_store["history_df"] = hist_df.copy()
+        shared_store["runs_df"] = active_df.copy()
+        if os.path.exists(LIVE_CSV_PATH):
+            shared_store["csv_mtime"] = os.path.getmtime(LIVE_CSV_PATH)
+        shared_store["version"] += 1
+        st.session_state.history_df = hist_df.copy()
+        st.session_state.runs_df = active_df.copy()
+        st.session_state.local_store_version = shared_store["version"]
+        return active_df
 
 
 def clear_all_records() -> None:
     """Clear all records from CSV and active state to start fresh from 0."""
-    empty_hist = dp.clear_runs_csv(LIVE_CSV_PATH)
-    empty_active = pd.DataFrame(columns=RUNS_SCHEMA)
-    shared_store["history_df"] = empty_hist.copy()
-    shared_store["runs_df"] = empty_active.copy()
-    if os.path.exists(LIVE_CSV_PATH):
-        shared_store["csv_mtime"] = os.path.getmtime(LIVE_CSV_PATH)
-    shared_store["version"] += 1
-    st.session_state.history_df = empty_hist.copy()
-    st.session_state.runs_df = empty_active.copy()
-    st.session_state.local_store_version = shared_store["version"]
-    st.session_state["_last_active_form_ctx"] = None
+    with dp.CSV_LOCK:
+        empty_hist = dp.clear_runs_csv(LIVE_CSV_PATH)
+        empty_active = pd.DataFrame(columns=RUNS_SCHEMA)
+        shared_store["explicitly_cleared"] = True
+        shared_store["history_df"] = empty_hist.copy()
+        shared_store["runs_df"] = empty_active.copy()
+        if os.path.exists(LIVE_CSV_PATH):
+            shared_store["csv_mtime"] = os.path.getmtime(LIVE_CSV_PATH)
+        shared_store["version"] += 1
+        st.session_state.history_df = empty_hist.copy()
+        st.session_state.runs_df = empty_active.copy()
+        st.session_state.local_store_version = shared_store["version"]
+        st.session_state["_last_active_form_ctx"] = None
 
 
 def commit_runs_df(new_df: pd.DataFrame, recalculate_totals: bool = True) -> pd.DataFrame:
     """Save full grid edits to CSV (with id and timestamp) and broadcast to all connected visualizers."""
-    dp.save_runs_to_csv(new_df, LIVE_CSV_PATH, recalculate_totals=recalculate_totals)
-    hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH, recalculate_totals=recalculate_totals)
-    cleaned = normalize_runs_df(hist_df)
-    shared_store["history_df"] = hist_df.copy()
-    shared_store["runs_df"] = cleaned.copy()
-    if os.path.exists(LIVE_CSV_PATH):
-        shared_store["csv_mtime"] = os.path.getmtime(LIVE_CSV_PATH)
-    shared_store["version"] += 1
-    st.session_state.history_df = hist_df.copy()
-    st.session_state.runs_df = cleaned.copy()
-    st.session_state.local_store_version = shared_store["version"]
-    st.session_state["_last_active_form_ctx"] = None
-    return cleaned
+    with dp.CSV_LOCK:
+        dp.save_runs_to_csv(new_df, LIVE_CSV_PATH, recalculate_totals=recalculate_totals)
+        hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH, recalculate_totals=recalculate_totals)
+        cleaned = normalize_runs_df(hist_df)
+        shared_store["explicitly_cleared"] = cleaned.empty
+        shared_store["history_df"] = hist_df.copy()
+        shared_store["runs_df"] = cleaned.copy()
+        if os.path.exists(LIVE_CSV_PATH):
+            shared_store["csv_mtime"] = os.path.getmtime(LIVE_CSV_PATH)
+        shared_store["version"] += 1
+        st.session_state.history_df = hist_df.copy()
+        st.session_state.runs_df = cleaned.copy()
+        st.session_state.local_store_version = shared_store["version"]
+        st.session_state["_last_active_form_ctx"] = None
+        return cleaned
 
 
 def save_and_sync_judge_scores(scores_df: pd.DataFrame, racing_pts_map: dict) -> pd.DataFrame:
     """Recalculate championship totals/ranks, persist judge scores to disk, and sync shared store."""
-    updated = scores_df.copy()
-    updated['Carrera'] = updated['team'].map(racing_pts_map).fillna(0.0)
-    cat_cols = [c for c in dp.DEFAULT_CATEGORIES if c in updated.columns]
-    updated['Total'] = updated[cat_cols].sum(axis=1).round(2)
-    updated = updated.sort_values(by='Total', ascending=False).reset_index(drop=True)
-    updated['rank'] = updated.index + 1
-    dp.save_judge_scores_to_csv(updated, JUDGE_CSV_PATH)
-    if os.path.exists(JUDGE_CSV_PATH):
-        shared_store["judge_csv_mtime"] = os.path.getmtime(JUDGE_CSV_PATH)
-    shared_store["custom_scores"] = updated.copy()
-    shared_store["version"] += 1
-    st.session_state.custom_scores = updated.copy()
-    st.session_state.local_store_version = shared_store["version"]
-    return updated
+    with dp.CSV_LOCK:
+        updated = scores_df.copy()
+        updated['Carrera'] = updated['team'].map(racing_pts_map).fillna(0.0)
+        cat_cols = [c for c in dp.DEFAULT_CATEGORIES if c in updated.columns]
+        updated['Total'] = updated[cat_cols].sum(axis=1).round(2)
+        updated = updated.sort_values(by='Total', ascending=False).reset_index(drop=True)
+        updated['rank'] = updated.index + 1
+        dp.save_judge_scores_to_csv(updated, JUDGE_CSV_PATH)
+        if os.path.exists(JUDGE_CSV_PATH):
+            shared_store["judge_csv_mtime"] = os.path.getmtime(JUDGE_CSV_PATH)
+        shared_store["custom_scores"] = updated.copy()
+        shared_store["version"] += 1
+        st.session_state.custom_scores = updated.copy()
+        st.session_state.local_store_version = shared_store["version"]
+        return updated
 
 
-@st.fragment(run_every=1.0)
+@st.fragment(run_every=2.5)
 def live_visualizer_sync_watcher():
-    """Background watcher that automatically refreshes visualizer tabs when records are saved."""
+    """Background watcher that refreshes passive visualizer tabs when records are saved."""
     store = get_shared_race_store()
-    if "history_df" not in store or store["history_df"] is None:
-        store["history_df"] = dp.load_runs_from_csv(LIVE_CSV_PATH)
-    if os.path.exists(LIVE_CSV_PATH):
-        try:
-            curr_mtime = os.path.getmtime(LIVE_CSV_PATH)
-            if curr_mtime > store["csv_mtime"] + 0.05:
-                hist_df = dp.load_runs_from_csv(LIVE_CSV_PATH)
-                store["history_df"] = hist_df
-                store["runs_df"] = normalize_runs_df(hist_df)
-                store["csv_mtime"] = curr_mtime
-                store["version"] += 1
-        except Exception:
-            pass
-    if os.path.exists(JUDGE_CSV_PATH):
-        try:
-            curr_j_mtime = os.path.getmtime(JUDGE_CSV_PATH)
-            if curr_j_mtime > store.get("judge_csv_mtime", 0.0) + 0.05:
-                loaded_j = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, {})
-                if loaded_j is not None:
-                    store["custom_scores"] = loaded_j
-                    store["judge_csv_mtime"] = curr_j_mtime
-                    store["version"] += 1
-        except Exception:
-            pass
+    sync_store_from_disk_if_needed(store)
     if st.session_state.get("local_store_version", -1) != store["version"]:
         st.session_state.history_df = store["history_df"].copy()
         st.session_state.runs_df = store["runs_df"].copy()
@@ -857,8 +866,8 @@ if selected_view == "📝 Pantalla de Edición y Registro":
     num_rxn_b_key = f"num_rxn_b_{team_b}_{selected_race_num}"
     num_race_b_key = f"num_race_b_{team_b}_{selected_race_num}"
 
-    # Sync widget state whenever matchup, race, or saved store version changes
-    active_form_ctx = (team_a, team_b, int(selected_race_num), shared_store["version"])
+    # Sync widget state only when the selected matchup or race number changes (never mid-edit on background version ticks)
+    active_form_ctx = (team_a, team_b, int(selected_race_num))
     if st.session_state.get("_last_active_form_ctx") != active_form_ctx:
         st.session_state[chk_dnf_a_key] = init_a_dnf
         st.session_state[chk_fs_a_key] = init_a_fs
@@ -953,7 +962,6 @@ if selected_view == "📝 Pantalla de Edición y Registro":
             else:
                 st.toast(f"🎲 Test Mode (Carrera {selected_race_num}): {team_a} [{lbl_a}] | {team_b} [{lbl_b}]. Presiona Guardar para registrar.")
 
-        # Checkboxes outside form so clicking DNF or False Start immediately disables inputs in gray
         col_fa_top, col_fb_top = st.columns(2)
         with col_fa_top:
             status_a_html = '<span style="font-size: 11px; color: #00F0FF; background: rgba(0, 240, 255, 0.12); padding: 2px 8px; border-radius: 6px; font-weight: 700;">✏️ Guardado (sobreescribible)</span>' if already_exists_a else '<span style="font-size: 11px; color: #A09EB8;">⏳ Sin registro</span>'
@@ -978,76 +986,76 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                 b_fs = False
                 st.markdown("<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 15px; font-weight: 800; color: #A09EB8;'>🏎️ Modalidad Individual</span><span style='font-size: 11px; color: #FCBC00; background: rgba(252, 188, 0, 0.14); padding: 2px 8px; border-radius: 6px; font-weight: 700;'>Sin Oponente</span></div>", unsafe_allow_html=True)
 
-        # Time inputs + Submit inside form so typing a correction and clicking Guardar commits on 1st click
-        with st.form(key=f"race_entry_form_{team_a}_{team_b}_{selected_race_num}", clear_on_submit=False, border=False):
-            col_fa, col_fb = st.columns(2)
+        # Direct session-state bound inputs (no nested st.form split) so toggling DNF/FS or clicking Guardar on mobile/desktop never drops typed numbers
+        col_fa, col_fb = st.columns(2)
 
-            # -----------------------------
-            # TEAM A INPUTS
-            # -----------------------------
-            with col_fa:
-                if a_fs:
-                    st.text_input("T. Reacción (s):", value="False Start", disabled=True, key=f"txt_rxn_a_{team_a}_{selected_race_num}_fs")
-                    st.text_input("T. Carrera (s):", value="False Start", disabled=True, key=f"txt_race_a_{team_a}_{selected_race_num}_fs")
-                    a_rxn = 0.0
-                    a_race = 0.0
-                    render_html('<div style="text-align: center; padding: 6px; background: rgba(255, 138, 0, 0.15); border: 1px solid #FF8A00; border-radius: 8px; margin: 8px 0;"><span class="sr-fs-badge">🚦 FALSE START</span><div style="font-size:11px; color:#A09EB8; margin-top:2px;">Carrera perdida por forfeit</div></div>')
-                elif a_dnf:
-                    st.text_input("T. Reacción (s):", value="DNF", disabled=True, key=f"txt_rxn_a_{team_a}_{selected_race_num}_dnf")
-                    st.text_input("T. Carrera (s):", value="DNF", disabled=True, key=f"txt_race_a_{team_a}_{selected_race_num}_dnf")
-                    a_rxn = 0.0
-                    a_race = 0.0
-                    render_html('<div style="text-align: center; padding: 6px; background: rgba(255, 42, 133, 0.15); border: 1px solid #FF2A85; border-radius: 8px; margin: 8px 0;"><span class="sr-dnf-badge">❌ RESULTADO: DNF</span></div>')
-                else:
-                    a_rxn = st.number_input("T. Reacción (s):", min_value=0.000, max_value=10.000, step=0.001, format="%.3f", key=num_rxn_a_key)
-                    a_race = st.number_input("T. Carrera (s):", min_value=0.000, max_value=30.000, step=0.001, format="%.3f", key=num_race_a_key)
-                    tot_a_prev = a_rxn + a_race
-                    render_html(f"""<div style="text-align: center; padding: 6px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 8px; margin: 8px 0;">
-                        <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo Total Registrado</div>
-                        <div style="font-size: 18px; font-weight: 900; color: #00F0FF;">{tot_a_prev:.3f} s</div>
-                    </div>""")
+        # -----------------------------
+        # TEAM A INPUTS
+        # -----------------------------
+        with col_fa:
+            if a_fs:
+                st.text_input("T. Reacción (s):", value="False Start", disabled=True, key=f"txt_rxn_a_{team_a}_{selected_race_num}_fs")
+                st.text_input("T. Carrera (s):", value="False Start", disabled=True, key=f"txt_race_a_{team_a}_{selected_race_num}_fs")
+                a_rxn = 0.0
+                a_race = 0.0
+                render_html('<div style="text-align: center; padding: 6px; background: rgba(255, 138, 0, 0.15); border: 1px solid #FF8A00; border-radius: 8px; margin: 8px 0;"><span class="sr-fs-badge">🚦 FALSE START</span><div style="font-size:11px; color:#A09EB8; margin-top:2px;">Carrera perdida por forfeit</div></div>')
+            elif a_dnf:
+                st.text_input("T. Reacción (s):", value="DNF", disabled=True, key=f"txt_rxn_a_{team_a}_{selected_race_num}_dnf")
+                st.text_input("T. Carrera (s):", value="DNF", disabled=True, key=f"txt_race_a_{team_a}_{selected_race_num}_dnf")
+                a_rxn = 0.0
+                a_race = 0.0
+                render_html('<div style="text-align: center; padding: 6px; background: rgba(255, 42, 133, 0.15); border: 1px solid #FF2A85; border-radius: 8px; margin: 8px 0;"><span class="sr-dnf-badge">❌ RESULTADO: DNF</span></div>')
+            else:
+                a_rxn = st.number_input("T. Reacción (s):", min_value=0.000, max_value=10.000, step=0.001, format="%.3f", key=num_rxn_a_key)
+                a_race = st.number_input("T. Carrera (s):", min_value=0.000, max_value=30.000, step=0.001, format="%.3f", key=num_race_a_key)
+                tot_a_prev = float(a_rxn) + float(a_race)
+                render_html(f"""<div style="text-align: center; padding: 6px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 8px; margin: 8px 0;">
+                    <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo Total Registrado</div>
+                    <div style="font-size: 18px; font-weight: 900; color: #00F0FF;">{tot_a_prev:.3f} s</div>
+                </div>""")
 
-            # -----------------------------
-            # TEAM B INPUTS (OR SOLO CARD)
-            # -----------------------------
-            with col_fb:
-                if is_solo_matchup:
-                    b_rxn = 0.0
-                    b_race = 0.0
-                    render_html(f"""<div style="text-align: center; padding: 28px 16px; background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.18); border-radius: 12px; margin: 8px 0;">
-                        <div style="font-size: 28px; margin-bottom: 6px;">🏁</div>
-                        <div style="font-size: 14px; font-weight: 800; color: #FFFFFF; text-transform: uppercase; letter-spacing: 0.8px;">Carrera Individual</div>
-                        <div style="font-size: 12px; color: #A09EB8; margin-top: 6px; line-height: 1.4;">
-                            <strong>{team_a}</strong> corre de forma individual en pista para todos los cálculos oficiales de puntuación (Tiempo de Carro y Tiempo Más Rápido).
-                        </div>
-                    </div>""")
-                elif b_fs:
-                    st.text_input("T. Reacción (s):", value="False Start", disabled=True, key=f"txt_rxn_b_{team_b}_{selected_race_num}_fs")
-                    st.text_input("T. Carrera (s):", value="False Start", disabled=True, key=f"txt_race_b_{team_b}_{selected_race_num}_fs")
-                    b_rxn = 0.0
-                    b_race = 0.0
-                    render_html('<div style="text-align: center; padding: 6px; background: rgba(255, 138, 0, 0.15); border: 1px solid #FF8A00; border-radius: 8px; margin: 8px 0;"><span class="sr-fs-badge">🚦 FALSE START</span><div style="font-size:11px; color:#A09EB8; margin-top:2px;">Carrera perdida por forfeit</div></div>')
-                elif b_dnf:
-                    st.text_input("T. Reacción (s):", value="DNF", disabled=True, key=f"txt_rxn_b_{team_b}_{selected_race_num}_dnf")
-                    st.text_input("T. Carrera (s):", value="DNF", disabled=True, key=f"txt_race_b_{team_b}_{selected_race_num}_dnf")
-                    b_rxn = 0.0
-                    b_race = 0.0
-                    render_html('<div style="text-align: center; padding: 6px; background: rgba(255, 42, 133, 0.15); border: 1px solid #FF2A85; border-radius: 8px; margin: 8px 0;"><span class="sr-dnf-badge">❌ RESULTADO: DNF</span></div>')
-                else:
-                    b_rxn = st.number_input("T. Reacción (s):", min_value=0.000, max_value=10.000, step=0.001, format="%.3f", key=num_rxn_b_key)
-                    b_race = st.number_input("T. Carrera (s):", min_value=0.000, max_value=30.000, step=0.001, format="%.3f", key=num_race_b_key)
-                    tot_b_prev = b_rxn + b_race
-                    render_html(f"""<div style="text-align: center; padding: 6px; background: rgba(255, 138, 0, 0.08); border: 1px solid rgba(255, 138, 0, 0.4); border-radius: 8px; margin: 8px 0;">
-                        <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo Total Registrado</div>
-                        <div style="font-size: 18px; font-weight: 900; color: #FF8A00;">{tot_b_prev:.3f} s</div>
-                    </div>""")
+        # -----------------------------
+        # TEAM B INPUTS (OR SOLO CARD)
+        # -----------------------------
+        with col_fb:
+            if is_solo_matchup:
+                b_rxn = 0.0
+                b_race = 0.0
+                render_html(f"""<div style="text-align: center; padding: 28px 16px; background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.18); border-radius: 12px; margin: 8px 0;">
+                    <div style="font-size: 28px; margin-bottom: 6px;">🏁</div>
+                    <div style="font-size: 14px; font-weight: 800; color: #FFFFFF; text-transform: uppercase; letter-spacing: 0.8px;">Carrera Individual</div>
+                    <div style="font-size: 12px; color: #A09EB8; margin-top: 6px; line-height: 1.4;">
+                        <strong>{team_a}</strong> corre de forma individual en pista para todos los cálculos oficiales de puntuación (Tiempo de Carro y Tiempo Más Rápido).
+                    </div>
+                </div>""")
+            elif b_fs:
+                st.text_input("T. Reacción (s):", value="False Start", disabled=True, key=f"txt_rxn_b_{team_b}_{selected_race_num}_fs")
+                st.text_input("T. Carrera (s):", value="False Start", disabled=True, key=f"txt_race_b_{team_b}_{selected_race_num}_fs")
+                b_rxn = 0.0
+                b_race = 0.0
+                render_html('<div style="text-align: center; padding: 6px; background: rgba(255, 138, 0, 0.15); border: 1px solid #FF8A00; border-radius: 8px; margin: 8px 0;"><span class="sr-fs-badge">🚦 FALSE START</span><div style="font-size:11px; color:#A09EB8; margin-top:2px;">Carrera perdida por forfeit</div></div>')
+            elif b_dnf:
+                st.text_input("T. Reacción (s):", value="DNF", disabled=True, key=f"txt_rxn_b_{team_b}_{selected_race_num}_dnf")
+                st.text_input("T. Carrera (s):", value="DNF", disabled=True, key=f"txt_race_b_{team_b}_{selected_race_num}_dnf")
+                b_rxn = 0.0
+                b_race = 0.0
+                render_html('<div style="text-align: center; padding: 6px; background: rgba(255, 42, 133, 0.15); border: 1px solid #FF2A85; border-radius: 8px; margin: 8px 0;"><span class="sr-dnf-badge">❌ RESULTADO: DNF</span></div>')
+            else:
+                b_rxn = st.number_input("T. Reacción (s):", min_value=0.000, max_value=10.000, step=0.001, format="%.3f", key=num_rxn_b_key)
+                b_race = st.number_input("T. Carrera (s):", min_value=0.000, max_value=30.000, step=0.001, format="%.3f", key=num_race_b_key)
+                tot_b_prev = float(b_rxn) + float(b_race)
+                render_html(f"""<div style="text-align: center; padding: 6px; background: rgba(255, 138, 0, 0.08); border: 1px solid rgba(255, 138, 0, 0.4); border-radius: 8px; margin: 8px 0;">
+                    <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo Total Registrado</div>
+                    <div style="font-size: 18px; font-weight: 900; color: #FF8A00;">{tot_b_prev:.3f} s</div>
+                </div>""")
 
-            st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-            submit_matchup_race = st.form_submit_button(
-                f"🏁 Guardar Resultados de Carrera {selected_race_num}",
-                use_container_width=True,
-                type="primary"
-            )
+        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+        submit_matchup_race = st.button(
+            f"🏁 Guardar Resultados de Carrera {selected_race_num}",
+            key=f"btn_save_race_{team_a}_{team_b}_{selected_race_num}",
+            use_container_width=True,
+            type="primary"
+        )
 
         if submit_matchup_race:
             has_data_a = bool(a_dnf or a_fs or (a_race > 0) or (a_rxn > 0))

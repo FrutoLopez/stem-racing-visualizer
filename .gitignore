@@ -11,3 +11,5 @@ backup_pre_changes_*/
 ~$Mockups.pptx
 scratch_pdf.py
 scratch_pdf_clean.py
+*.tmp
+*.bak

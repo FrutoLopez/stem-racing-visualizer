@@ -10,12 +10,40 @@ Computes official timing metrics, head-to-head pairings, and official scoring sy
 import csv
 import os
 import re
+import shutil
+import threading
 from datetime import datetime
 from io import BytesIO, StringIO
 from typing import Dict, List, Tuple, Any, Optional
 import pandas as pd
 import numpy as np
 import openpyxl
+
+CSV_LOCK = threading.RLock()
+
+
+def _atomic_write_csv(df: pd.DataFrame, path: str, create_backup: bool = True) -> None:
+    """
+    Write a DataFrame to CSV atomically using a temporary file + flush + os.fsync + os.replace.
+    Prevents data loss or 0-byte truncation if the OS crashes or another device reads concurrently.
+    Also maintains a `.bak` backup copy when `create_backup=True` and `df` is non-empty.
+    """
+    tmp_path = f"{path}.tmp"
+    bak_path = f"{path}.bak"
+    with CSV_LOCK:
+        with open(tmp_path, "w", encoding="utf-8", newline="") as f:
+            df.to_csv(f, index=False)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except OSError:
+                pass
+        os.replace(tmp_path, path)
+        if create_backup and not df.empty:
+            try:
+                shutil.copy2(path, bak_path)
+            except OSError:
+                pass
 
 DEFAULT_CATEGORIES = [
     "Identidad de Marca",
@@ -131,24 +159,39 @@ def load_runs_from_csv(file_source: Any, recalculate_totals: bool = False) -> pd
     """
     Load runs from a CSV file (filepath, BytesIO, DataFrame, or Streamlit UploadedFile).
     Preserves the full append-only CSV log including general `id` and `timestamp`.
+    Automatically recovers from `filepath.bak` if the main CSV was truncated/corrupted by an OS crash.
     """
     cols_schema = CSV_SCHEMA
-    try:
-        if isinstance(file_source, pd.DataFrame):
-            df = file_source.copy()
-        elif isinstance(file_source, str):
-            if not os.path.exists(file_source) or os.path.getsize(file_source) == 0:
-                return pd.DataFrame(columns=cols_schema)
-            df = pd.read_csv(file_source)
-        elif isinstance(file_source, BytesIO):
-            df = pd.read_csv(file_source)
-        else:
-            content = file_source.getvalue() if hasattr(file_source, 'getvalue') else file_source.read()
-            if not content:
-                return pd.DataFrame(columns=cols_schema)
-            df = pd.read_csv(BytesIO(content))
-    except Exception:
-        return pd.DataFrame(columns=cols_schema)
+    df = None
+    with CSV_LOCK:
+        try:
+            if isinstance(file_source, pd.DataFrame):
+                df = file_source.copy()
+            elif isinstance(file_source, str):
+                bak_path = f"{file_source}.bak"
+                if os.path.exists(file_source) and os.path.getsize(file_source) > 0:
+                    try:
+                        df = pd.read_csv(file_source)
+                    except Exception:
+                        df = None
+                if (df is None or df.empty) and os.path.exists(bak_path) and os.path.getsize(bak_path) > 0:
+                    try:
+                        df = pd.read_csv(bak_path)
+                        if df is not None and not df.empty:
+                            shutil.copy2(bak_path, file_source)
+                    except Exception:
+                        df = None
+                if df is None:
+                    return pd.DataFrame(columns=cols_schema)
+            elif isinstance(file_source, BytesIO):
+                df = pd.read_csv(file_source)
+            else:
+                content = file_source.getvalue() if hasattr(file_source, 'getvalue') else file_source.read()
+                if not content:
+                    return pd.DataFrame(columns=cols_schema)
+                df = pd.read_csv(BytesIO(content))
+        except Exception:
+            return pd.DataFrame(columns=cols_schema)
 
     if df.empty:
         return pd.DataFrame(columns=cols_schema)
@@ -265,46 +308,56 @@ def load_runs_from_csv(file_source: Any, recalculate_totals: bool = False) -> pd
 
 
 def save_runs_to_csv(df_runs: pd.DataFrame, path: str = "live_race_data.csv", recalculate_totals: bool = False) -> None:
-    """Save runs dataframe (with id and timestamp) to CSV file."""
+    """Save runs dataframe (with id and timestamp) to CSV file atomically with backup."""
     cols = CSV_SCHEMA
-    if df_runs is None or df_runs.empty:
-        empty_df = pd.DataFrame(columns=cols)
-        empty_df.to_csv(path, index=False)
-        return
-    out = load_runs_from_csv(df_runs, recalculate_totals=recalculate_totals)
-    available_cols = [c for c in cols if c in out.columns]
-    out[available_cols].to_csv(path, index=False)
+    with CSV_LOCK:
+        if df_runs is None or df_runs.empty:
+            empty_df = pd.DataFrame(columns=cols)
+            _atomic_write_csv(empty_df, path, create_backup=False)
+            return
+        out = load_runs_from_csv(df_runs, recalculate_totals=recalculate_totals)
+        available_cols = [c for c in cols if c in out.columns]
+        _atomic_write_csv(out[available_cols], path, create_backup=True)
 
 
 def append_runs_to_csv(new_rows: List[Dict[str, Any]], path: str = "live_race_data.csv") -> pd.DataFrame:
     """
     Append new or edited race records to the CSV file with a general sequential `id`
     and current `timestamp`, keeping all historical entries in the CSV audit log.
+    Protected by CSV_LOCK and atomic writes so concurrent clients never lose records.
     """
-    hist_df = load_runs_from_csv(path)
-    next_id = (int(hist_df['id'].max()) + 1) if (not hist_df.empty and 'id' in hist_df.columns and hist_df['id'].notna().any()) else 1
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with CSV_LOCK:
+        hist_df = load_runs_from_csv(path)
+        next_id = (int(hist_df['id'].max()) + 1) if (not hist_df.empty and 'id' in hist_df.columns and hist_df['id'].notna().any()) else 1
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    prepared = []
-    for row in new_rows:
-        item = dict(row)
-        item['id'] = next_id
-        item['timestamp'] = now_str
-        next_id += 1
-        prepared.append(item)
+        prepared = []
+        for row in new_rows:
+            item = dict(row)
+            item['id'] = next_id
+            item['timestamp'] = now_str
+            next_id += 1
+            prepared.append(item)
 
-    if prepared:
-        new_df = pd.DataFrame(prepared)[CSV_SCHEMA]
-        hist_df = pd.concat([hist_df, new_df], ignore_index=True) if not hist_df.empty else new_df
-        save_runs_to_csv(hist_df, path)
-    return hist_df
+        if prepared:
+            new_df = pd.DataFrame(prepared)[CSV_SCHEMA]
+            hist_df = pd.concat([hist_df, new_df], ignore_index=True) if not hist_df.empty else new_df
+            save_runs_to_csv(hist_df, path)
+        return hist_df
 
 
 def clear_runs_csv(path: str = "live_race_data.csv") -> pd.DataFrame:
-    """Clear all records from the CSV file to start fresh from 0."""
-    empty_df = pd.DataFrame(columns=CSV_SCHEMA)
-    empty_df.to_csv(path, index=False)
-    return empty_df
+    """Clear all records from the CSV file and its backup to start fresh from 0."""
+    with CSV_LOCK:
+        empty_df = pd.DataFrame(columns=CSV_SCHEMA)
+        _atomic_write_csv(empty_df, path, create_backup=False)
+        bak_path = f"{path}.bak"
+        if os.path.exists(bak_path):
+            try:
+                _atomic_write_csv(empty_df, bak_path, create_backup=False)
+            except OSError:
+                pass
+        return empty_df
 
 
 def check_races_culminated(df_runs: pd.DataFrame, all_teams: Optional[List[str]] = None) -> Tuple[bool, int, int]:
@@ -735,12 +788,12 @@ def get_default_category_scores(
 
 
 def save_judge_scores_to_csv(df_scores: pd.DataFrame, path: str = "judge_scores.csv") -> None:
-    """Persist non-racing judge category scores to CSV on disk."""
+    """Persist non-racing judge category scores to CSV on disk atomically with backup."""
     if df_scores is None or df_scores.empty:
         return
     cols = ['team'] + NON_RACING_CATEGORIES
     available = [c for c in cols if c in df_scores.columns]
-    df_scores[available].to_csv(path, index=False)
+    _atomic_write_csv(df_scores[available], path, create_backup=True)
 
 
 def load_judge_scores_from_csv(
@@ -748,13 +801,25 @@ def load_judge_scores_from_csv(
     teams: List[str],
     race_points_map: Dict[str, float]
 ) -> Optional[pd.DataFrame]:
-    """Load persisted judge category scores from CSV on disk if available."""
-    if not os.path.exists(path) or os.path.getsize(path) == 0:
+    """Load persisted judge category scores from CSV on disk (or .bak backup) if available."""
+    bak_path = f"{path}.bak"
+    df = None
+    with CSV_LOCK:
+        if os.path.exists(path) and os.path.getsize(path) > 0:
+            try:
+                df = pd.read_csv(path)
+            except Exception:
+                df = None
+        if (df is None or df.empty or 'team' not in df.columns) and os.path.exists(bak_path) and os.path.getsize(bak_path) > 0:
+            try:
+                df = pd.read_csv(bak_path)
+                if df is not None and not df.empty and 'team' in df.columns:
+                    shutil.copy2(bak_path, path)
+            except Exception:
+                df = None
+    if df is None or df.empty or 'team' not in df.columns:
         return None
     try:
-        df = pd.read_csv(path)
-        if df.empty or 'team' not in df.columns:
-            return None
         df['team'] = df['team'].astype(str).str.strip().replace(LEGACY_TEAM_MAP)
         base_df = get_default_category_scores(teams, race_points_map, zero_init=False)
         for _, row in df.iterrows():
