@@ -1450,49 +1450,56 @@ elif selected_view == "🏆 Ceremonia de Podio":
 
 elif selected_view == "📝 Registro de Jurado":
     # -------------------------------------------------------------------------
-    # PANTALLA: REGISTRO DE JURADO (HOJA OFICIAL DE EVALUACIÓN POR EQUIPO)
+    # PANTALLA: REGISTRO DE JURADO (HOJA DE EVALUACIÓN POR EQUIPO)
     # -------------------------------------------------------------------------
     live_visualizer_sync_watcher()
-    render_html(styles.render_app_header(logo_b64))
 
-    # Clean, simple title
-    render_html("""
-    <div style="text-align: center; margin-bottom: 20px;">
-        <h2 style="font-size: 26px; font-weight: 900; font-style: italic; color: #FFFFFF; margin: 0; letter-spacing: 0.5px;">
-            📝 Registro de Jurado
-        </h2>
-        <div style="font-size: 13.5px; color: #A0A0B5; margin-top: 5px;">
-            Ingresa y edita los puntos de jurado para cada equipo (770 pts jurado + 220 pts carrera = 990 pts total). Coincide con la plantilla de Excel.
-        </div>
-    </div>
-    """)
-
-    # Team selector bar: compact and centered
+    # Team selector state initialization
     if "judging_summary_team_idx" not in st.session_state:
         st.session_state.judging_summary_team_idx = 0
+    if "_pending_jurado_team_idx" in st.session_state:
+        st.session_state.judging_summary_team_idx = int(st.session_state.pop("_pending_jurado_team_idx")) % len(official_teams)
+        st.session_state["reg_jurado_sel_team"] = official_teams[st.session_state.judging_summary_team_idx]
     if st.session_state.judging_summary_team_idx >= len(official_teams):
         st.session_state.judging_summary_team_idx = 0
+    if st.session_state.get("reg_jurado_sel_team") not in official_teams:
+        st.session_state["reg_jurado_sel_team"] = official_teams[st.session_state.judging_summary_team_idx]
 
-    _, col_tnav_prev, col_tsel, col_tnav_next, _ = st.columns([0.6, 1.2, 4.4, 1.2, 0.6], vertical_alignment="center")
+    if "_pending_jurado_subcats" in st.session_state:
+        pending_team, pending_vals = st.session_state.pop("_pending_jurado_subcats")
+        for s_k, s_v in pending_vals.items():
+            st.session_state[f"rj_{pending_team}_{s_k}"] = float(s_v)
+
+    def _on_jurado_team_select():
+        sel = st.session_state.get("reg_jurado_sel_team")
+        if sel in official_teams:
+            st.session_state.judging_summary_team_idx = official_teams.index(sel)
+
+    # Compact header row: Title + Team selector in a single row to avoid scrolling
+    _, col_title_bar, col_tnav_prev, col_tsel, col_tnav_next, _ = st.columns([0.4, 1.9, 0.9, 2.7, 0.9, 0.4], gap="small", vertical_alignment="center")
+    with col_title_bar:
+        render_html("""
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size: 19px; font-weight: 900; font-style: italic; color: #FFFFFF; letter-spacing: 0.3px;">📝 Registro de Jurado</span>
+        </div>
+        """)
     with col_tnav_prev:
-        if st.button("⬅️ Anterior", use_container_width=True, key="reg_jurado_prev_btn"):
-            st.session_state.judging_summary_team_idx = (st.session_state.judging_summary_team_idx - 1) % len(official_teams)
+        if st.button("⬅️ Ant.", use_container_width=True, key="reg_jurado_prev_btn"):
+            st.session_state._pending_jurado_team_idx = (st.session_state.judging_summary_team_idx - 1) % len(official_teams)
             st.rerun()
     with col_tsel:
         selected_team = st.selectbox(
             "Seleccionar Equipo:",
             options=official_teams,
-            index=st.session_state.judging_summary_team_idx,
             key="reg_jurado_sel_team",
-            format_func=lambda t: f"Equipo #{official_teams.index(t)+1}: {t}  —  {dp.TEAM_TO_SCHOOL_MAP.get(t, '')}",
+            on_change=_on_jurado_team_select,
+            format_func=lambda t: f"#{official_teams.index(t)+1} {t} — {dp.TEAM_TO_SCHOOL_MAP.get(t, '')}",
             label_visibility="collapsed"
         )
-        if selected_team != official_teams[st.session_state.judging_summary_team_idx]:
-            st.session_state.judging_summary_team_idx = official_teams.index(selected_team)
-            st.rerun()
+        st.session_state.judging_summary_team_idx = official_teams.index(selected_team)
     with col_tnav_next:
-        if st.button("Siguiente ➡️", use_container_width=True, key="reg_jurado_next_btn"):
-            st.session_state.judging_summary_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
+        if st.button("Sig. ➡️", use_container_width=True, key="reg_jurado_next_btn"):
+            st.session_state._pending_jurado_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
             st.rerun()
 
     # Get team data
@@ -1512,114 +1519,112 @@ elif selected_view == "📝 Registro de Jurado":
     racing_subtotal = float(racing_pts_map.get(selected_team, 0.0))
 
     # Center the scorecard box
-    _, col_scorecard, _ = st.columns([0.4, 6.2, 0.4])
+    _, col_scorecard, _ = st.columns([0.4, 6.4, 0.4])
 
     with col_scorecard:
-        # 1. Top Metadata Bar (Team Number, Team Name, School)
-        render_html(f"""
-        <div style="background: #F2F2F2; color: #000; border: 1.5px solid #888; border-bottom: none; border-radius: 4px 4px 0 0; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; font-family: 'Montserrat', sans-serif;">
-            <div style="flex: 1;"><strong>Team Number:</strong> <span style="font-weight: 900; color: #000; margin-left: 6px;">{team_num}</span></div>
-            <div style="flex: 1.5; text-align: center;"><strong>Team Name:</strong> <span style="font-weight: 900; color: #000; margin-left: 6px;">{selected_team}</span></div>
-            <div style="flex: 1.8; text-align: right;"><strong>School:</strong> <span style="font-weight: 900; color: #000; margin-left: 6px;">{school_name}</span></div>
-        </div>
-        <div style="display: flex; background: #E8E8E8; color: #000; font-weight: 800; font-size: 13.5px; border: 1.5px solid #888; border-bottom: 2px solid #666; align-items: center; text-transform: uppercase; font-family: 'Montserrat', sans-serif;">
-            <div style="flex: 5.6; padding: 9px 12px; border-right: 1.5px solid #888;">Judging Category / Assessment Area</div>
-            <div style="flex: 2.4; padding: 9px 10px; text-align: center; border-right: 1.5px solid #888;">Points Available</div>
-            <div style="flex: 2.0; padding: 9px 10px; text-align: center;">Awarded Points</div>
-        </div>
-        """)
-
         new_subcat_inputs = {}
+        with st.container():
+            render_html('<span class="sr-jurado-compact-marker" style="display:none;"></span>')
 
-        # Loop through categories
-        for cat_cfg in dp.JUDGING_BREAKDOWN_CONFIG:
-            cat_name = cat_cfg["category"]
-            cat_off_label = cat_cfg["official_label"]
-            cat_max = cat_cfg["max_points"]
+            # Loop through categories
+            for cat_idx, cat_cfg in enumerate(dp.JUDGING_BREAKDOWN_CONFIG):
+                cat_name = cat_cfg["category"]
+                cat_off_label = cat_cfg["official_label"]
+                cat_max = cat_cfg["max_points"]
+                cat_color = cat_cfg.get("color", "#E6007E")
 
-            # Calculate live sum for this category
-            cat_current_sum = 0.0
-            for sub_item in cat_cfg["subcategories"]:
-                s_key = sub_item["key"]
-                input_key = f"rj_{selected_team}_{s_key}"
-                if input_key in st.session_state:
-                    cat_current_sum += float(st.session_state[input_key])
-                else:
-                    cat_current_sum += float(cur_subcats.get(s_key, 0.0))
+                # Visual divider between sections (skip before the very first category)
+                if cat_idx > 0:
+                    render_html('<div class="sr-jurado-divider"></div>')
 
-            # Yellow Category Header Row
+                # Calculate live sum for this category
+                cat_current_sum = 0.0
+                for sub_item in cat_cfg["subcategories"]:
+                    s_key = sub_item["key"]
+                    input_key = f"rj_{selected_team}_{s_key}"
+                    if input_key in st.session_state:
+                        cat_current_sum += float(st.session_state[input_key])
+                    else:
+                        cat_current_sum += float(cur_subcats.get(s_key, 0.0))
+
+                # Category Header Row (Dark theme with category color accent)
+                render_html(f"""
+                <div class="sr-jurado-cat-head" style="border-left-color: {cat_color};">
+                    <span class="sr-jurado-cat-name">{cat_off_label}</span>
+                    <span class="sr-jurado-cat-badge">{min(float(cat_max), cat_current_sum):.0f} / {cat_max} pts</span>
+                </div>
+                """)
+
+                # Subcategory rows
+                for sub_item in cat_cfg["subcategories"]:
+                    s_key = sub_item["key"]
+                    s_label = sub_item["label"]
+                    s_max = sub_item["max_points"]
+                    s_step = sub_item.get("step", 1)
+
+                    c_sub1, c_sub2, c_sub3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
+                    with c_sub1:
+                        render_html(f'<div class="sr-jurado-sub-label">{s_label}</div>')
+                    with c_sub2:
+                        render_html(f'<div class="sr-jurado-sub-pts">{s_max} pts</div>')
+                    with c_sub3:
+                        val_input = st.number_input(
+                            f"{s_label}",
+                            min_value=0.0,
+                            max_value=float(s_max),
+                            value=float(min(float(s_max), max(0.0, cur_subcats.get(s_key, 0.0)))),
+                            step=float(s_step),
+                            format="%.0f",
+                            label_visibility="collapsed",
+                            key=f"rj_{selected_team}_{s_key}"
+                        )
+                        new_subcat_inputs[s_key] = val_input
+
+            # Visual divider before Racing section
+            render_html('<div class="sr-jurado-divider"></div>')
+
+            # Racing Row (Dark theme, cyan accent)
             render_html(f"""
-            <div style="display: flex; background: #FFFF00; color: #000; font-weight: 800; font-size: 14px; border: 1.5px solid #888; border-top: 1.5px solid #666; border-bottom: 1.5px solid #666; align-items: center; font-family: 'Montserrat', sans-serif; margin-bottom: 3px;">
-                <div style="flex: 5.6; padding: 8px 12px; border-right: 1.5px solid #888;">{cat_off_label}</div>
-                <div style="flex: 2.4; padding: 8px 10px; text-align: center; border-right: 1.5px solid #888;">{cat_max} points</div>
-                <div style="flex: 2.0; padding: 8px 10px; text-align: center; font-size: 15px;">{min(float(cat_max), cat_current_sum):.0f}</div>
+            <div class="sr-jurado-racing-head">
+                <span class="sr-jurado-cat-name" style="color: #009FE3;">Racing</span>
+                <span class="sr-jurado-cat-badge" style="color: #009FE3; background: rgba(0,159,227,0.14); border-color: rgba(0,159,227,0.4);">{racing_subtotal:.1f} / 220 pts</span>
             </div>
             """)
 
-            # Subcategory rows
-            for sub_item in cat_cfg["subcategories"]:
-                s_key = sub_item["key"]
-                s_label = sub_item["label"]
-                s_max = sub_item["max_points"]
-                s_step = sub_item.get("step", 1)
+            # Racing sub-rows: Time Trials & Reaction Racing
+            c_r1, c_r2, c_r3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
+            with c_r1:
+                render_html('<div class="sr-jurado-sub-label">Time Trials</div>')
+            with c_r2:
+                render_html('<div class="sr-jurado-sub-pts">110 pts</div>')
+            with c_r3:
+                render_html(f'<div class="sr-jurado-sub-val">{tt_pts:.1f}</div>')
 
-                c_sub1, c_sub2, c_sub3 = st.columns([5.6, 2.4, 2.0], gap="small", vertical_alignment="center")
-                with c_sub1:
-                    render_html(f'<div class="sr-sub-c1-box">{s_label}</div>')
-                with c_sub2:
-                    render_html(f'<div class="sr-sub-c2-box">{s_max} points</div>')
-                with c_sub3:
-                    val_input = st.number_input(
-                        f"{s_label}",
-                        min_value=0.0,
-                        max_value=float(s_max),
-                        value=float(min(float(s_max), max(0.0, cur_subcats.get(s_key, 0.0)))),
-                        step=float(s_step),
-                        format="%.0f",
-                        label_visibility="collapsed",
-                        key=f"rj_{selected_team}_{s_key}"
-                    )
-                    new_subcat_inputs[s_key] = val_input
+            c_rx1, c_rx2, c_rx3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
+            with c_rx1:
+                render_html('<div class="sr-jurado-sub-label">Reaction Racing</div>')
+            with c_rx2:
+                render_html('<div class="sr-jurado-sub-pts">110 pts</div>')
+            with c_rx3:
+                render_html(f'<div class="sr-jurado-sub-val">{rr_pts:.1f}</div>')
 
-        # Red Racing Row (220 pts)
-        render_html(f"""
-        <div style="display: flex; background: #FF0000; color: #FFF; font-weight: 800; font-size: 14px; border: 1.5px solid #888; border-top: 2px solid #555; border-bottom: 1.5px solid #777; align-items: center; font-family: 'Montserrat', sans-serif; margin-top: 4px; margin-bottom: 3px;">
-            <div style="flex: 5.6; padding: 8px 12px; border-right: 1.5px solid #FFF;">Racing</div>
-            <div style="flex: 2.4; padding: 8px 10px; text-align: center; border-right: 1.5px solid #FFF;">220 points</div>
-            <div style="flex: 2.0; padding: 8px 10px; text-align: center; font-size: 15px;">{racing_subtotal:.1f}</div>
-        </div>
-        """)
+            # TOTAL Row (Gold & Pink accent)
+            live_non_racing_sum = sum(new_subcat_inputs.values())
+            live_grand_total = round(live_non_racing_sum + racing_subtotal, 1)
 
-        # Racing sub-rows: Time Trials & Reaction Racing
-        c_r1, c_r2, c_r3 = st.columns([5.6, 2.4, 2.0], gap="small", vertical_alignment="center")
-        with c_r1:
-            render_html('<div class="sr-sub-c1-box">Time Trials</div>')
-        with c_r2:
-            render_html('<div class="sr-sub-c2-box">110 points</div>')
-        with c_r3:
-            render_html(f'<div class="sr-sub-c3-box">{tt_pts:.1f}</div>')
+            render_html(f"""
+            <div class="sr-jurado-total-head">
+                <div style="display:flex; align-items:baseline; gap:10px;">
+                    <span style="font-size: 13.5px; font-weight: 900; font-style: italic; color: #FFFFFF;">TOTAL COMPETENCIA</span>
+                    <span style="font-size: 11px; color: #A0A0B5;">(Jueces: {live_non_racing_sum:.0f} pts | Carrera: {racing_subtotal:.1f} pts)</span>
+                </div>
+                <div style="font-size: 18px; font-weight: 900; color: #FCBC00;">
+                    {live_grand_total:.1f} <span style="font-size: 12px; color: #E0E0E0;">/ 990 pts</span>
+                </div>
+            </div>
+            """)
 
-        c_rx1, c_rx2, c_rx3 = st.columns([5.6, 2.4, 2.0], gap="small", vertical_alignment="center")
-        with c_rx1:
-            render_html('<div class="sr-sub-c1-box">Reaction Racing</div>')
-        with c_rx2:
-            render_html('<div class="sr-sub-c2-box">110 points</div>')
-        with c_rx3:
-            render_html(f'<div class="sr-sub-c3-box">{rr_pts:.1f}</div>')
-
-        # Black TOTAL Row (990 pts)
-        live_non_racing_sum = sum(new_subcat_inputs.values())
-        live_grand_total = round(live_non_racing_sum + racing_subtotal, 1)
-
-        render_html(f"""
-        <div style="display: flex; background: #000000; color: #FFF; font-weight: 900; font-size: 15px; border: 2px solid #000; border-radius: 0 0 4px 4px; align-items: center; font-family: 'Montserrat', sans-serif; margin-top: 4px;">
-            <div style="flex: 5.6; padding: 10px 12px; border-right: 1.5px solid #444;">TOTAL</div>
-            <div style="flex: 2.4; padding: 10px 10px; text-align: center; border-right: 1.5px solid #444;">990 points</div>
-            <div style="flex: 2.0; padding: 10px 10px; text-align: center; font-size: 18px; color: #FCBC00;">{live_grand_total:.1f}</div>
-        </div>
-        """)
-
-        st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
         # Action Buttons right below the cuadro
         def save_team_scores(team_name: str, subcats_dict: dict):
@@ -1641,24 +1646,26 @@ elif selected_view == "📝 Registro de Jurado":
         with col_b2:
             if st.button("💾 Guardar y Siguiente ➡️", use_container_width=True, key="rj_save_next_btn"):
                 save_team_scores(selected_team, new_subcat_inputs)
-                st.session_state.judging_summary_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
+                st.session_state._pending_jurado_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
                 st.toast(f"✅ {selected_team} guardado. Pasando al siguiente equipo...")
                 st.rerun()
         with col_b3:
             if st.button("🎲 Datos de Prueba", use_container_width=True, key="rj_rnd_team_btn", help="Genera puntajes de prueba para este equipo."):
                 rnd_sub = dp.generate_random_subcategories_for_team()
                 save_team_scores(selected_team, rnd_sub)
+                st.session_state._pending_jurado_subcats = (selected_team, rnd_sub)
                 st.toast(f"🎲 Datos de prueba generados para {selected_team}.")
                 st.rerun()
         with col_b4:
             if st.button("🔄 Reiniciar a 0", use_container_width=True, key="rj_zero_team_btn", help="Pone las subcategorías de este equipo en 0."):
                 zero_sub = {k: 0.0 for k in dp.ALL_SUBCATEGORY_KEYS}
                 save_team_scores(selected_team, zero_sub)
+                st.session_state._pending_jurado_subcats = (selected_team, zero_sub)
                 st.toast(f"🗑️ Subcategorías de {selected_team} en 0.")
                 st.rerun()
 
     # Expandable Summary Table at bottom
-    with st.expander("📊 Ver Tabla Resumen de Todos los Equipos y Exportar CSV"):
+    with st.expander("📊 Ver Tabla Resumen de Todos los Equipos y Descargar/Subir Plantilla CSV"):
         matrix_rows = []
         for t_idx, row in st.session_state.custom_scores.iterrows():
             t_n = str(row['team'])
@@ -1676,8 +1683,48 @@ elif selected_view == "📝 Registro de Jurado":
                 "TOTAL (990)": round(float(row.get('Total', 0.0)), 1),
             })
         st.dataframe(pd.DataFrame(matrix_rows), hide_index=True, use_container_width=True)
-        exp_csv = st.session_state.custom_scores.to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Descargar CSV de Jurado", data=exp_csv, file_name=f"registro_jurado_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", mime="text/csv", key="rj_dl_csv")
+
+        col_dl1, col_dl2 = st.columns(2)
+        with col_dl1:
+            # Build transposed export of current scores (Rows = Rubros, Columns = Teams)
+            transposed_export_rows = []
+            for cat_cfg in dp.JUDGING_BREAKDOWN_CONFIG:
+                for sub in cat_cfg["subcategories"]:
+                    sub_key = sub["key"]
+                    r_dict = {
+                        "Rubro": sub["label"],
+                        "Key": sub_key,
+                        "Puntos Max": sub["max_points"]
+                    }
+                    for _, row_sc in st.session_state.custom_scores.iterrows():
+                        t_name = str(row_sc["team"])
+                        r_dict[t_name] = float(row_sc.get(sub_key, 0.0))
+                    transposed_export_rows.append(r_dict)
+            exp_transposed_csv = pd.DataFrame(transposed_export_rows).to_csv(index=False).encode("utf-8")
+
+            st.download_button(
+                "📥 Descargar CSV de Jurado Actual",
+                data=exp_transposed_csv,
+                file_name=f"registro_jurado_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="rj_dl_csv",
+                help="Descarga el estado actual en formato transpuesta (filas: rubros, columnas: equipos)."
+            )
+        with col_dl2:
+            plantilla_path = "plantilla_registro_jurado.csv"
+            if os.path.exists(plantilla_path):
+                with open(plantilla_path, "rb") as f:
+                    plantilla_bytes = f.read()
+                st.download_button(
+                    "📄 Descargar Plantilla CSV en Blanco",
+                    data=plantilla_bytes,
+                    file_name="plantilla_registro_jurado.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key="rj_dl_plantilla_csv",
+                    help="Descarga la plantilla con las filas como rubros y las columnas como equipos lista para rellenar."
+                )
 
 else:
     # -------------------------------------------------------------------------

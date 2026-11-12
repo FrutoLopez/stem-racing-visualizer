@@ -758,25 +758,25 @@ JUDGING_BREAKDOWN_CONFIG = [
         "subcategories": [
             {
                 "key": "scrutineering_specifications",
-                "label": "Specifications (págs. 3-5)",
+                "label": "Specifications",
                 "max_points": 110,
                 "step": 1,
             },
             {
                 "key": "scrutineering_drawings",
-                "label": "Engineering Drawings (pág. 2)",
+                "label": "Engineering Drawings",
                 "max_points": 20,
                 "step": 1,
             },
             {
                 "key": "scrutineering_renderings",
-                "label": "Renderings (pág. 2)",
+                "label": "Renderings",
                 "max_points": 20,
                 "step": 1,
             },
             {
                 "key": "scrutineering_assembly",
-                "label": "Quality of Finish and Assembly (pág. 2)",
+                "label": "Quality of Finish and Assembly",
                 "max_points": 20,
                 "step": 1,
             },
@@ -790,7 +790,7 @@ JUDGING_BREAKDOWN_CONFIG = [
         "subcategories": [
             {
                 "key": "design_portfolio",
-                "label": "Design & Engineering Portfolio (pág. 6)",
+                "label": "Design & Engineering Portfolio",
                 "max_points": 180,
                 "step": 1,
             },
@@ -804,13 +804,13 @@ JUDGING_BREAKDOWN_CONFIG = [
         "subcategories": [
             {
                 "key": "enterprise_management",
-                "label": "Project Management (pág. 7)",
+                "label": "Project Management",
                 "max_points": 80,
                 "step": 1,
             },
             {
                 "key": "enterprise_marketing",
-                "label": "Sponsorship & Marketing (pág. 7)",
+                "label": "Sponsorship & Marketing",
                 "max_points": 80,
                 "step": 1,
             },
@@ -824,19 +824,19 @@ JUDGING_BREAKDOWN_CONFIG = [
         "subcategories": [
             {
                 "key": "verbal_technique",
-                "label": "Technique (pág. 8)",
+                "label": "Technique",
                 "max_points": 60,
                 "step": 1,
             },
             {
                 "key": "verbal_composition",
-                "label": "Composition (pág. 8)",
+                "label": "Composition",
                 "max_points": 40,
                 "step": 1,
             },
             {
                 "key": "verbal_subject",
-                "label": "Subject Matter (pág. 8)",
+                "label": "Subject Matter",
                 "max_points": 60,
                 "step": 1,
             },
@@ -850,13 +850,13 @@ JUDGING_BREAKDOWN_CONFIG = [
         "subcategories": [
             {
                 "key": "brand_pit_display",
-                "label": "Pit Display (pág. 9)",
+                "label": "Pit Display",
                 "max_points": 60,
                 "step": 1,
             },
             {
                 "key": "brand_corporate_identity",
-                "label": "Corporate Identity (pág. 9)",
+                "label": "Corporate Identity",
                 "max_points": 40,
                 "step": 1,
             },
@@ -1377,29 +1377,144 @@ def _parse_breakdown_grid_rows(
 
 def _try_parse_tabular_df(df: pd.DataFrame, official_teams: List[str]) -> Dict[str, Dict[str, float]]:
     """
-    Parse a standard tabular CSV/Excel where each row is a team and columns are categories.
+    Parse a standard tabular CSV/Excel where:
+    Format A: Each row is a team, and columns are categories or subcategories.
+    Format B (Transposed): Each row is a rubric / assessment item, and columns are teams.
+    Supports both high-level categories (Especificaciones, Diseño, etc.) and granular subcategories
+    (scrutineering_specifications, enterprise_management, verbal_technique, etc.).
     """
     if df is None or df.empty:
         return {}
 
+    # Normalization mappings for subcategories
+    subcat_aliases = {
+        # Scrutineering
+        "scrutineering_specifications": ("scrutineering_specifications", "specifications", "especificaciones"),
+        "scrutineering_drawings": ("scrutineering_drawings", "drawings", "planos", "engineering drawings"),
+        "scrutineering_renderings": ("scrutineering_renderings", "renderings", "renders"),
+        "scrutineering_assembly": ("scrutineering_assembly", "quality of finish", "acabado y ensamble", "assembly"),
+        # Design & Engineering
+        "design_portfolio": ("design_portfolio", "design & engineering portfolio", "portafolio de diseno", "portafolio de diseño"),
+        # Enterprise
+        "enterprise_management": ("enterprise_management", "project management", "gestion de proyecto", "gestión de proyecto"),
+        "enterprise_marketing": ("enterprise_marketing", "sponsorship & marketing", "sponsorship and marketing", "patrocinio y marketing"),
+        # Verbal
+        "verbal_technique": ("verbal_technique", "technique", "tecnica", "técnica"),
+        "verbal_composition": ("verbal_composition", "composition", "composicion", "composición"),
+        "verbal_subject": ("verbal_subject", "subject matter", "tema", "contenido verbal"),
+        # Brand
+        "brand_pit_display": ("brand_pit_display", "pit display", "stand de pits", "display de pits"),
+        "brand_corporate_identity": ("brand_corporate_identity", "corporate identity", "identidad corporativa"),
+    }
+
+    category_aliases = {
+        "Especificaciones y Escrutinio": ("escrutinio", "scrutineering", "specification", "especificaciones y escrutinio"),
+        "Diseño e Ingeniería": ("diseño", "diseno", "design", "engineering", "diseño e ingeniería"),
+        "Gestión de Proyecto": ("gestión", "gestion", "enterprise", "empresa", "gestión de proyecto"),
+        "Presentación Verbal": ("verbal", "presentación", "presentacion", "presentación verbal"),
+        "Identidad de Marca": ("identidad", "marca", "brand", "identidad de marca"),
+    }
+
+    def _resolve_rubric_key(text_val: Any) -> Tuple[Optional[str], Optional[str]]:
+        """Given a label or key string, returns (subcat_key, cat_name)."""
+        t_str = str(text_val).strip().lower()
+        if not t_str:
+            return None, None
+        for skey, aliases in subcat_aliases.items():
+            if t_str == skey or any(alias in t_str for alias in aliases):
+                return skey, None
+        for cname, aliases in category_aliases.items():
+            if any(alias in t_str for alias in aliases):
+                return None, cname
+        return None, None
+
+    # =========================================================================
+    # CHECK FORMAT B (Transposed): Rows = Rubros, Columns = Teams
+    # Look for team names in df.columns
+    # =========================================================================
+    matched_team_cols: Dict[str, str] = {}
+    rubric_label_col: Optional[str] = None
+    rubric_key_col: Optional[str] = None
+
+    for c in df.columns:
+        c_str = str(c).strip()
+        c_low = c_str.lower()
+        if c_low in ("key", "clave", "subcat_key", "codigo"):
+            rubric_key_col = c
+            continue
+        if c_low in ("rubro", "rubros", "categoria", "subcategoria", "item", "criterio", "assessment area", "judging category"):
+            rubric_label_col = c
+            continue
+        # Check if column matches an official team
+        matched_t = resolve_team_identity(c_str, None, None, "", official_teams)
+        if matched_t:
+            matched_team_cols[c] = matched_t
+
+    # If at least 2 teams are columns (or 1 team and a rubric column exists)
+    if (len(matched_team_cols) >= 2) or (matched_team_cols and (rubric_label_col or rubric_key_col)):
+        if not rubric_label_col and not rubric_key_col:
+            # First non-team column can be the rubric label
+            for c in df.columns:
+                if c not in matched_team_cols:
+                    rubric_label_col = c
+                    break
+
+        transposed_results: Dict[str, Dict[str, float]] = {t: {} for t in matched_team_cols.values()}
+
+        for _, row in df.iterrows():
+            sub_k, cat_n = None, None
+            if rubric_key_col and pd.notna(row.get(rubric_key_col)):
+                sub_k, cat_n = _resolve_rubric_key(row.get(rubric_key_col))
+            if not sub_k and not cat_n and rubric_label_col and pd.notna(row.get(rubric_label_col)):
+                sub_k, cat_n = _resolve_rubric_key(row.get(rubric_label_col))
+
+            if not sub_k and not cat_n:
+                continue
+
+            for col_c, team_name in matched_team_cols.items():
+                v = _parse_numeric_score(row.get(col_c))
+                if v is not None:
+                    if sub_k:
+                        max_pts = float(SUBCATEGORY_MAX_POINTS.get(sub_k, 200))
+                        transposed_results[team_name][sub_k] = max(0.0, min(max_pts, round(v, 2)))
+                    elif cat_n:
+                        max_pts = float(CATEGORY_MAX_POINTS.get(cat_n, 200))
+                        transposed_results[team_name][cat_n] = max(0.0, min(max_pts, round(v, 2)))
+
+        # Compute category totals from subcategories
+        final_transposed: Dict[str, Dict[str, float]] = {}
+        for t_name, scores in transposed_results.items():
+            if scores:
+                sub_dict = {k: v for k, v in scores.items() if k in ALL_SUBCATEGORY_KEYS}
+                if sub_dict:
+                    comp = compute_category_totals_from_subcategories(sub_dict)
+                    for c_k, c_v in comp.items():
+                        if c_k not in scores:
+                            scores[c_k] = c_v
+                final_transposed[t_name] = scores
+        if final_transposed:
+            return final_transposed
+
+    # =========================================================================
+    # CHECK FORMAT A: Rows = Teams, Columns = Categories/Subcategories
+    # =========================================================================
     col_map: Dict[str, str] = {}
+    subcat_col_map: Dict[str, str] = {}
     team_col: Optional[str] = None
+
     for c in df.columns:
         c_low = str(c).strip().lower()
-        if c_low in ("team", "equipo", "team name", "nombre del equipo", "equipos"):
+        if c_low in ("team", "equipo", "team name", "nombre del equipo", "equipos", "nombre"):
             team_col = c
-        elif "escrutinio" in c_low or "scrutineering" in c_low or "specification" in c_low:
-            col_map[c] = "Especificaciones y Escrutinio"
-        elif "diseño" in c_low or "diseno" in c_low or "design" in c_low or "engineering" in c_low:
-            col_map[c] = "Diseño e Ingeniería"
-        elif "gestión" in c_low or "gestion" in c_low or "enterprise" in c_low or "empresa" in c_low:
-            col_map[c] = "Gestión de Proyecto"
-        elif "verbal" in c_low or "presentación" in c_low or "presentacion" in c_low:
-            col_map[c] = "Presentación Verbal"
-        elif "identidad" in c_low or "marca" in c_low or "brand" in c_low:
-            col_map[c] = "Identidad de Marca"
+            continue
 
-    if not team_col or not col_map:
+        sub_k, cat_n = _resolve_rubric_key(c)
+        if sub_k:
+            subcat_col_map[c] = sub_k
+        elif cat_n:
+            col_map[c] = cat_n
+
+    if not team_col or (not col_map and not subcat_col_map):
         return {}
 
     results: Dict[str, Dict[str, float]] = {}
@@ -1411,11 +1526,30 @@ def _try_parse_tabular_df(df: pd.DataFrame, official_teams: List[str]) -> Dict[s
         if not matched:
             continue
         scores: Dict[str, float] = {}
+
+        # 1. Parse subcategories if present
+        parsed_subcats: Dict[str, float] = {}
+        for src_col, target_sub in subcat_col_map.items():
+            v = _parse_numeric_score(row.get(src_col))
+            if v is not None:
+                max_pts = float(SUBCATEGORY_MAX_POINTS.get(target_sub, 200))
+                val_sub = max(0.0, min(max_pts, round(v, 2)))
+                scores[target_sub] = val_sub
+                parsed_subcats[target_sub] = val_sub
+
+        # If subcategories were provided, calculate category totals from them
+        if parsed_subcats:
+            computed_cats = compute_category_totals_from_subcategories(parsed_subcats)
+            for c_name, c_tot in computed_cats.items():
+                scores[c_name] = c_tot
+
+        # 2. Parse main categories if not already provided or if explicitly defined
         for src_col, target_cat in col_map.items():
             v = _parse_numeric_score(row.get(src_col))
             if v is not None:
                 max_pts = float(CATEGORY_MAX_POINTS.get(target_cat, 200))
                 scores[target_cat] = max(0.0, min(max_pts, round(v, 2)))
+
         if scores:
             results[matched] = scores
     return results

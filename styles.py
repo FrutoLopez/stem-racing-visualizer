@@ -701,138 +701,138 @@ input:disabled, .stTextInput input:disabled, div[data-baseweb="input"] input:dis
 }
 
 /* ==========================================================================
-   OFFICIAL EXCEL SCORECARD EXACT STYLES (Registro de Jurado)
+   REGISTRO DE JURADO - COMPACT DARK MOTORSPORT SCORECARD STYLES
    ========================================================================== */
-.sr-excel-container {
-    max-width: 860px;
-    margin: 0 auto 16px auto;
-    border: 2px solid #808080;
-    border-radius: 6px;
-    background: #FFFFFF;
-    color: #000000;
-    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.75);
-    overflow: hidden;
-    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) {
+    gap: 0px !important;
+    background: rgba(18, 14, 28, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 4px 10px 6px 10px;
+    box-shadow: 0 8px 24px rgba(5, 0, 11, 0.65);
 }
-.sr-excel-meta-bar {
-    background: #F2F2F2;
-    border-bottom: 2px solid #888888;
-    padding: 9px 16px;
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stHorizontalBlock"] {
+    gap: 4px !important;
+    align-items: center !important;
+    margin-bottom: 0px !important;
+    margin-top: 0px !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] {
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+    min-height: 22px !important;
+    height: 22px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] input {
+    padding: 0 2px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    height: 20px !important;
+    min-height: 20px !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] button {
+    height: 20px !important;
+    min-height: 20px !important;
+    padding: 0 4px !important;
+}
+.sr-jurado-cat-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 13.5px;
-    color: #111111;
-    flex-wrap: wrap;
-    gap: 10px;
+    background: rgba(30, 24, 46, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-left: 3px solid #E6007E;
+    border-radius: 4px;
+    padding: 3px 8px;
+    margin-top: 5px;
+    margin-bottom: 2px;
 }
-.sr-excel-col-head {
-    display: flex;
-    background: #E8E8E8;
-    border-bottom: 1.5px solid #888888;
+.sr-jurado-divider {
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.18) 15%, rgba(255, 255, 255, 0.18) 85%, rgba(255, 255, 255, 0.0) 100%);
+    margin: 4px 0 2px 0;
+}
+.sr-jurado-cat-name {
+    font-size: 11.5px;
     font-weight: 800;
-    font-size: 13px;
-    color: #111111;
-    letter-spacing: 0.3px;
-    align-items: center;
+    font-style: italic;
+    color: #FFFFFF;
+    letter-spacing: 0.2px;
 }
-.sr-excel-yellow-head {
-    display: flex;
-    background: #FFFF00 !important;
-    color: #000000 !important;
+.sr-jurado-cat-badge {
+    font-size: 11px;
     font-weight: 800;
-    font-size: 13.5px;
-    border-top: 1px solid #777;
-    border-bottom: 1px solid #777;
-    align-items: center;
+    color: #FCBC00;
+    background: rgba(252, 188, 0, 0.12);
+    border: 1px solid rgba(252, 188, 0, 0.3);
+    border-radius: 3px;
+    padding: 0px 6px;
 }
-.sr-excel-red-head {
-    display: flex;
-    background: #FF0000 !important;
-    color: #FFFFFF !important;
-    font-weight: 800;
-    font-size: 14px;
-    border-top: 1.5px solid #555;
-    border-bottom: 1px solid #777;
-    align-items: center;
-}
-.sr-excel-black-head {
-    display: flex;
-    background: #000000 !important;
-    color: #FFFFFF !important;
-    font-weight: 900;
-    font-size: 15px;
-    border-top: 2px solid #000000;
-    align-items: center;
-}
-.sr-cell-c1 {
-    flex: 5.6;
-    padding: 7px 12px;
-    border-right: 1px solid rgba(0,0,0,0.18);
-    display: flex;
-    align-items: center;
-}
-.sr-cell-c2 {
-    flex: 2.4;
-    padding: 7px 10px;
-    text-align: center;
-    border-right: 1px solid rgba(0,0,0,0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-}
-.sr-cell-c3 {
-    flex: 2.0;
-    padding: 7px 10px;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 800;
-}
-.sr-excel-row-item {
-    margin-bottom: -1px;
-}
-.sr-sub-c1-box {
-    background: #FFFFFF;
-    color: #1A1A1A;
+.sr-jurado-sub-label {
+    background: rgba(255, 255, 255, 0.03);
+    color: #F0F0F5;
     font-weight: 500;
-    font-size: 13px;
-    padding: 4px 12px;
-    border: 1px solid #D0D0D0;
-    height: 38px;
+    font-size: 11.5px;
+    padding: 0 8px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 3px;
+    height: 22px;
     display: flex;
     align-items: center;
-    border-radius: 2px;
 }
-.sr-sub-c2-box {
-    background: #D9D9D9;
-    color: #000000;
+.sr-jurado-sub-pts {
+    background: rgba(255, 255, 255, 0.05);
+    color: #A0A0B5;
     font-weight: 700;
-    font-size: 13px;
-    padding: 4px 8px;
-    border: 1px solid #BFBFBF;
-    height: 38px;
+    font-size: 11px;
+    padding: 0 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    border-radius: 2px;
 }
-.sr-sub-c3-box {
-    background: #FFFFFF;
-    color: #000000;
+.sr-jurado-sub-val {
+    background: rgba(0, 159, 227, 0.10);
+    color: #009FE3;
     font-weight: 800;
-    font-size: 14px;
-    padding: 4px 8px;
-    border: 1px solid #D0D0D0;
-    height: 38px;
+    font-size: 11.5px;
+    padding: 0 4px;
+    border: 1px solid rgba(0, 159, 227, 0.3);
+    border-radius: 3px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    border-radius: 2px;
+}
+.sr-jurado-racing-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 159, 227, 0.12);
+    border: 1px solid rgba(0, 159, 227, 0.35);
+    border-left: 3px solid #009FE3;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin-top: 2px;
+    margin-bottom: 0px;
+}
+.sr-jurado-total-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(230, 0, 126, 0.22) 0%, rgba(252, 188, 0, 0.16) 100%);
+    border: 1.5px solid rgba(252, 188, 0, 0.55);
+    border-radius: 5px;
+    padding: 3px 10px;
+    margin-top: 3px;
 }
 div[data-testid="stNumberInput"] input {
     text-align: center !important;
