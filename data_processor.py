@@ -84,6 +84,7 @@ LEGACY_TEAM_MAP = {
     "Brader": "Raiders",
     "TJS": "Cybercolts Racing",
     "Casco": "PNTHR",
+    "ISP": "ISP",
 }
 
 SCHOOL_TO_TEAM_MAP = {
@@ -100,6 +101,21 @@ SCHOOL_TO_TEAM_MAP = {
     "thomas jefferson": "Cybercolts Racing",
     "tjs": "Cybercolts Racing",
     "casco": "PNTHR",
+    "isp": "ISP",
+    "international school of panama": "ISP",
+}
+
+TEAM_TO_SCHOOL_MAP = {
+    "BoscoTech": "Instituto Técnico Don Bosco (ITDB)",
+    "JAF Racing Team": "St. George's International School",
+    "Excalibur": "The Oxford School",
+    "Rayo Rabin": "Colegio Isaac Rabin",
+    "Hayai Aerodynamics": "Panamerican School",
+    "Dim3nsion": "Centro Cultural Chino Panameño (Sun Yat Sen)",
+    "Raiders": "Colegio Brader",
+    "Cybercolts Racing": "Thomas Jefferson School (TJS)",
+    "PNTHR": "The Casco School",
+    "ISP": "International School of Panama (ISP)",
 }
 
 
@@ -730,6 +746,190 @@ CATEGORY_MAX_POINTS = {
     "Total": 990
 }
 
+# ==============================================================================
+# OFFICIAL STEM RACING JUDGING BREAKDOWN CONFIGURATION (5 Non-Racing Categories)
+# ==============================================================================
+JUDGING_BREAKDOWN_CONFIG = [
+    {
+        "category": "Especificaciones y Escrutinio",
+        "official_label": "Specification and Scrutineering Judging",
+        "max_points": 170,
+        "color": "#00ADB5",
+        "subcategories": [
+            {
+                "key": "scrutineering_specifications",
+                "label": "Specifications (págs. 3-5)",
+                "max_points": 110,
+                "step": 1,
+            },
+            {
+                "key": "scrutineering_drawings",
+                "label": "Engineering Drawings (pág. 2)",
+                "max_points": 20,
+                "step": 1,
+            },
+            {
+                "key": "scrutineering_renderings",
+                "label": "Renderings (pág. 2)",
+                "max_points": 20,
+                "step": 1,
+            },
+            {
+                "key": "scrutineering_assembly",
+                "label": "Quality of Finish and Assembly (pág. 2)",
+                "max_points": 20,
+                "step": 1,
+            },
+        ],
+    },
+    {
+        "category": "Diseño e Ingeniería",
+        "official_label": "Design and Engineering Judging",
+        "max_points": 180,
+        "color": "#FF9F43",
+        "subcategories": [
+            {
+                "key": "design_portfolio",
+                "label": "Design & Engineering Portfolio (pág. 6)",
+                "max_points": 180,
+                "step": 1,
+            },
+        ],
+    },
+    {
+        "category": "Gestión de Proyecto",
+        "official_label": "Enterprise Judging",
+        "max_points": 160,
+        "color": "#10B981",
+        "subcategories": [
+            {
+                "key": "enterprise_management",
+                "label": "Project Management (pág. 7)",
+                "max_points": 80,
+                "step": 1,
+            },
+            {
+                "key": "enterprise_marketing",
+                "label": "Sponsorship & Marketing (pág. 7)",
+                "max_points": 80,
+                "step": 1,
+            },
+        ],
+    },
+    {
+        "category": "Presentación Verbal",
+        "official_label": "Verbal Presentation Judging",
+        "max_points": 160,
+        "color": "#A855F7",
+        "subcategories": [
+            {
+                "key": "verbal_technique",
+                "label": "Technique (pág. 8)",
+                "max_points": 60,
+                "step": 1,
+            },
+            {
+                "key": "verbal_composition",
+                "label": "Composition (pág. 8)",
+                "max_points": 40,
+                "step": 1,
+            },
+            {
+                "key": "verbal_subject",
+                "label": "Subject Matter (pág. 8)",
+                "max_points": 60,
+                "step": 1,
+            },
+        ],
+    },
+    {
+        "category": "Identidad de Marca",
+        "official_label": "Brand Identity Judging",
+        "max_points": 100,
+        "color": "#EC4899",
+        "subcategories": [
+            {
+                "key": "brand_pit_display",
+                "label": "Pit Display (pág. 9)",
+                "max_points": 60,
+                "step": 1,
+            },
+            {
+                "key": "brand_corporate_identity",
+                "label": "Corporate Identity (pág. 9)",
+                "max_points": 40,
+                "step": 1,
+            },
+        ],
+    },
+]
+
+ALL_SUBCATEGORY_KEYS = [
+    sub["key"]
+    for cat in JUDGING_BREAKDOWN_CONFIG
+    for sub in cat["subcategories"]
+]
+
+SUBCATEGORY_MAX_POINTS = {
+    sub["key"]: sub["max_points"]
+    for cat in JUDGING_BREAKDOWN_CONFIG
+    for sub in cat["subcategories"]
+}
+
+SUBCATEGORY_LABELS = {
+    sub["key"]: sub["label"]
+    for cat in JUDGING_BREAKDOWN_CONFIG
+    for sub in cat["subcategories"]
+}
+
+SUBCATEGORY_TO_CATEGORY = {
+    sub["key"]: cat["category"]
+    for cat in JUDGING_BREAKDOWN_CONFIG
+    for sub in cat["subcategories"]
+}
+
+CATEGORY_TO_SUBCATEGORIES = {
+    cat["category"]: [sub["key"] for sub in cat["subcategories"]]
+    for cat in JUDGING_BREAKDOWN_CONFIG
+}
+
+
+def compute_category_totals_from_subcategories(subcats: Dict[str, float]) -> Dict[str, float]:
+    """Calculate the 5 main non-racing category totals from their subcategory values."""
+    totals: Dict[str, float] = {}
+    for cat in JUDGING_BREAKDOWN_CONFIG:
+        c_name = cat["category"]
+        c_max = float(cat["max_points"])
+        sub_sum = sum(float(subcats.get(sub["key"], 0.0)) for sub in cat["subcategories"])
+        totals[c_name] = max(0.0, min(c_max, round(sub_sum, 2)))
+    return totals
+
+
+def generate_random_subcategories_for_team() -> Dict[str, int]:
+    """
+    Generate realistic random test scores for all 12 non-racing subcategories within official limits:
+    - Scrutineering: spec 75-108, drawings 13-19, renderings 13-19, assembly 13-19 (max 170)
+    - Design: portfolio 130-178 (max 180)
+    - Enterprise: management 55-78, marketing 55-78 (max 160)
+    - Verbal: technique 42-58, composition 28-39, subject 42-58 (max 160)
+    - Brand: pit display 42-58, corporate 28-39 (max 100)
+    """
+    rng = np.random.default_rng()
+    return {
+        "scrutineering_specifications": int(rng.integers(75, 109)),
+        "scrutineering_drawings": int(rng.integers(13, 20)),
+        "scrutineering_renderings": int(rng.integers(13, 20)),
+        "scrutineering_assembly": int(rng.integers(13, 20)),
+        "design_portfolio": int(rng.integers(130, 179)),
+        "enterprise_management": int(rng.integers(55, 79)),
+        "enterprise_marketing": int(rng.integers(55, 79)),
+        "verbal_technique": int(rng.integers(42, 59)),
+        "verbal_composition": int(rng.integers(28, 39)),
+        "verbal_subject": int(rng.integers(42, 59)),
+        "brand_pit_display": int(rng.integers(42, 59)),
+        "brand_corporate_identity": int(rng.integers(28, 39)),
+    }
+
 
 def get_default_category_scores(
     teams: List[str],
@@ -745,41 +945,50 @@ def get_default_category_scores(
     5. Presentación Verbal (160 points max)
     6. Carrera (220 points max: Time Trials 110 + Reaction 110)
     Total points: 990. Determines the final championship podium.
+    Also initializes and tracks all 12 official subcategories.
     """
     if not teams:
-        cols = ['rank', 'team', 'Total'] + DEFAULT_CATEGORIES
+        cols = ['rank', 'team', 'Total'] + DEFAULT_CATEGORIES + ALL_SUBCATEGORY_KEYS
         return pd.DataFrame(columns=cols)
 
     data = []
     for team in teams:
         carrera_pts = float(race_points_map.get(team, 0.0))
         if zero_init:
-            identidad = 0.0
-            verbal = 0.0
-            escrutinio = 0.0
-            diseno = 0.0
-            gestion = 0.0
+            subcats = {k: 0.0 for k in ALL_SUBCATEGORY_KEYS}
         else:
             seed = sum(ord(c) for c in team)
             rng = np.random.default_rng(seed)
-            identidad = float(rng.integers(70, 96))      # max 100
-            verbal = float(rng.integers(115, 155))        # max 160
-            escrutinio = float(rng.integers(120, 165))    # max 170
-            diseno = float(rng.integers(130, 175))        # max 180
-            gestion = float(rng.integers(115, 155))       # max 160
+            subcats = {
+                "scrutineering_specifications": float(rng.integers(75, 108)),
+                "scrutineering_drawings": float(rng.integers(13, 20)),
+                "scrutineering_renderings": float(rng.integers(13, 20)),
+                "scrutineering_assembly": float(rng.integers(13, 20)),
+                "design_portfolio": float(rng.integers(130, 178)),
+                "enterprise_management": float(rng.integers(55, 78)),
+                "enterprise_marketing": float(rng.integers(55, 78)),
+                "verbal_technique": float(rng.integers(42, 59)),
+                "verbal_composition": float(rng.integers(28, 39)),
+                "verbal_subject": float(rng.integers(42, 59)),
+                "brand_pit_display": float(rng.integers(42, 59)),
+                "brand_corporate_identity": float(rng.integers(28, 39)),
+            }
 
-        total = round(identidad + verbal + carrera_pts + escrutinio + diseno + gestion, 2)
+        cat_totals = compute_category_totals_from_subcategories(subcats)
+        total = round(sum(cat_totals.values()) + carrera_pts, 2)
 
-        data.append({
+        row_dict = {
             'team': team,
-            'Identidad de Marca': identidad,
-            'Presentación Verbal': verbal,
+            'Identidad de Marca': cat_totals['Identidad de Marca'],
+            'Presentación Verbal': cat_totals['Presentación Verbal'],
             'Carrera': carrera_pts,
-            'Especificaciones y Escrutinio': escrutinio,
-            'Diseño e Ingeniería': diseno,
-            'Gestión de Proyecto': gestion,
+            'Especificaciones y Escrutinio': cat_totals['Especificaciones y Escrutinio'],
+            'Diseño e Ingeniería': cat_totals['Diseño e Ingeniería'],
+            'Gestión de Proyecto': cat_totals['Gestión de Proyecto'],
             'Total': total
-        })
+        }
+        row_dict.update(subcats)
+        data.append(row_dict)
 
     df = pd.DataFrame(data)
     df = df.sort_values(by='Total', ascending=False).reset_index(drop=True)
@@ -788,10 +997,10 @@ def get_default_category_scores(
 
 
 def save_judge_scores_to_csv(df_scores: pd.DataFrame, path: str = "judge_scores.csv") -> None:
-    """Persist non-racing judge category scores to CSV on disk atomically with backup."""
+    """Persist non-racing judge category and subcategory scores to CSV on disk atomically with backup."""
     if df_scores is None or df_scores.empty:
         return
-    cols = ['team'] + NON_RACING_CATEGORIES
+    cols = ['team'] + NON_RACING_CATEGORIES + [c for c in ALL_SUBCATEGORY_KEYS if c in df_scores.columns]
     available = [c for c in cols if c in df_scores.columns]
     _atomic_write_csv(df_scores[available], path, create_backup=True)
 
@@ -801,7 +1010,7 @@ def load_judge_scores_from_csv(
     teams: List[str],
     race_points_map: Dict[str, float]
 ) -> Optional[pd.DataFrame]:
-    """Load persisted judge category scores from CSV on disk (or .bak backup) if available."""
+    """Load persisted judge category and subcategory scores from CSV on disk (or .bak backup) if available."""
     bak_path = f"{path}.bak"
     df = None
     with CSV_LOCK:
@@ -826,11 +1035,27 @@ def load_judge_scores_from_csv(
             t_name = str(row['team']).strip()
             mask = base_df['team'] == t_name
             if mask.any():
-                for col in NON_RACING_CATEGORIES:
-                    if col in df.columns and pd.notna(row[col]):
-                        val = float(pd.to_numeric(row[col], errors='coerce') or 0.0)
-                        max_pts = float(CATEGORY_MAX_POINTS.get(col, 200))
-                        base_df.loc[mask, col] = max(0.0, min(max_pts, round(val, 2)))
+                # Load subcategories if present
+                has_any_subcat = False
+                for sub_k in ALL_SUBCATEGORY_KEYS:
+                    if sub_k in df.columns and pd.notna(row[sub_k]):
+                        val = float(pd.to_numeric(row[sub_k], errors='coerce') or 0.0)
+                        max_s = float(SUBCATEGORY_MAX_POINTS.get(sub_k, 200))
+                        base_df.loc[mask, sub_k] = max(0.0, min(max_s, round(val, 2)))
+                        has_any_subcat = True
+
+                if has_any_subcat:
+                    sub_vals = {k: float(base_df.loc[mask, k].iloc[0]) for k in ALL_SUBCATEGORY_KEYS}
+                    cat_from_sub = compute_category_totals_from_subcategories(sub_vals)
+                    for cat_col, cat_val in cat_from_sub.items():
+                        base_df.loc[mask, cat_col] = cat_val
+                else:
+                    for col in NON_RACING_CATEGORIES:
+                        if col in df.columns and pd.notna(row[col]):
+                            val = float(pd.to_numeric(row[col], errors='coerce') or 0.0)
+                            max_pts = float(CATEGORY_MAX_POINTS.get(col, 200))
+                            base_df.loc[mask, col] = max(0.0, min(max_pts, round(val, 2)))
+
         base_df['Carrera'] = base_df['team'].map(race_points_map).fillna(0.0)
         base_df['Total'] = base_df[DEFAULT_CATEGORIES].sum(axis=1).round(2)
         base_df = base_df.sort_values(by='Total', ascending=False).reset_index(drop=True)
@@ -945,6 +1170,7 @@ def _parse_breakdown_grid_rows(
                 "main": {},
                 "sub": {cat: 0.0 for cat in NON_RACING_CATEGORIES},
                 "sub_found": {cat: False for cat in NON_RACING_CATEGORIES},
+                "subcategories": {},
                 "scorecard": {cat: 0.0 for cat in NON_RACING_CATEGORIES},
                 "scorecard_found": {cat: False for cat in NON_RACING_CATEGORIES},
             }
@@ -1036,26 +1262,49 @@ def _parse_breakdown_grid_rows(
             if val is not None:
                 bucket["sub"]["Especificaciones y Escrutinio"] += val
                 bucket["sub_found"]["Especificaciones y Escrutinio"] = True
+                if label_low.startswith("specifications ("):
+                    bucket["subcategories"]["scrutineering_specifications"] = val
+                elif label_low.startswith("engineering drawings ("):
+                    bucket["subcategories"]["scrutineering_drawings"] = val
+                elif label_low.startswith("renderings ("):
+                    bucket["subcategories"]["scrutineering_renderings"] = val
+                elif label_low.startswith("quality of finish and assembly ("):
+                    bucket["subcategories"]["scrutineering_assembly"] = val
         elif label_low.startswith("design & engineering portfolio ("):
             val = extract_row_score(awarded_col_idx)
             if val is not None:
                 bucket["sub"]["Diseño e Ingeniería"] += val
                 bucket["sub_found"]["Diseño e Ingeniería"] = True
+                bucket["subcategories"]["design_portfolio"] = val
         elif any(label_low.startswith(p) for p in ("project management (", "sponsorship & marketing (")):
             val = extract_row_score(awarded_col_idx)
             if val is not None:
                 bucket["sub"]["Gestión de Proyecto"] += val
                 bucket["sub_found"]["Gestión de Proyecto"] = True
+                if label_low.startswith("project management ("):
+                    bucket["subcategories"]["enterprise_management"] = val
+                elif label_low.startswith("sponsorship & marketing ("):
+                    bucket["subcategories"]["enterprise_marketing"] = val
         elif any(label_low.startswith(p) for p in ("technique (", "composition (", "subject matter (")):
             val = extract_row_score(awarded_col_idx)
             if val is not None:
                 bucket["sub"]["Presentación Verbal"] += val
                 bucket["sub_found"]["Presentación Verbal"] = True
+                if label_low.startswith("technique ("):
+                    bucket["subcategories"]["verbal_technique"] = val
+                elif label_low.startswith("composition ("):
+                    bucket["subcategories"]["verbal_composition"] = val
+                elif label_low.startswith("subject matter ("):
+                    bucket["subcategories"]["verbal_subject"] = val
         elif any(label_low.startswith(p) for p in ("pit display (", "corporate identity (")):
             val = extract_row_score(awarded_col_idx)
             if val is not None:
                 bucket["sub"]["Identidad de Marca"] += val
                 bucket["sub_found"]["Identidad de Marca"] = True
+                if label_low.startswith("pit display ("):
+                    bucket["subcategories"]["brand_pit_display"] = val
+                elif label_low.startswith("corporate identity ("):
+                    bucket["subcategories"]["brand_corporate_identity"] = val
 
         # ------------------------------------------------------------------
         # 3. Individual Scorecard Total Rows (Fallback across scorecard sheets)
@@ -1117,6 +1366,11 @@ def _parse_breakdown_grid_rows(
             for cat, val in cat_scores.items():
                 if cat not in results[team_name] or val > results[team_name][cat]:
                     results[team_name][cat] = val
+
+            # Also transfer parsed subcategories
+            for sub_k, sub_v in b.get("subcategories", {}).items():
+                max_s = float(SUBCATEGORY_MAX_POINTS.get(sub_k, 200))
+                results[team_name][sub_k] = max(0.0, min(max_s, round(float(sub_v), 2)))
 
     return results
 

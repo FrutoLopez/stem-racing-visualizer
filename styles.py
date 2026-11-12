@@ -552,6 +552,153 @@ input:disabled, .stTextInput input:disabled, div[data-baseweb="input"] input:dis
     opacity: 0;
     animation: srFadeSlideUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) 2.65s forwards;
 }
+
+/* ==========================================================================
+   OFFICIAL STEM RACING - JUDGING BREAKDOWN SCORECARD STYLES
+   ========================================================================== */
+.sr-judging-panel {
+    background: rgba(18, 14, 28, 0.92);
+    border: 1px solid rgba(230, 0, 126, 0.35);
+    border-radius: 16px;
+    padding: 22px 26px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 36px rgba(5, 0, 11, 0.7);
+    backdrop-filter: blur(14px);
+    position: relative;
+    overflow: hidden;
+}
+.sr-judging-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #E6007E 0%, #ED6D05 35%, #FCBC00 70%, #009FE3 100%);
+}
+.sr-judging-header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: rgba(230, 0, 126, 0.15);
+    border: 1px solid rgba(230, 0, 126, 0.45);
+    color: #FF6BAC;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+.sr-judging-title {
+    font-size: 26px;
+    font-weight: 900;
+    font-style: italic;
+    color: #FFFFFF;
+    margin: 0 0 6px 0;
+    letter-spacing: 0.5px;
+}
+.sr-judging-subtitle {
+    font-size: 13px;
+    color: #A0A0B5;
+    margin: 0 0 18px 0;
+}
+.sr-judging-cat-box {
+    background: rgba(25, 20, 38, 0.82);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 5px solid #00ADB5;
+    padding: 16px 20px;
+    margin-bottom: 18px;
+    transition: all 0.25s ease;
+}
+.sr-judging-cat-box:hover {
+    border-color: rgba(255, 255, 255, 0.20);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.40);
+}
+.sr-judging-cat-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.sr-judging-cat-name {
+    font-size: 16px;
+    font-weight: 800;
+    font-style: italic;
+    color: #FFFFFF;
+    letter-spacing: 0.3px;
+}
+.sr-judging-cat-subtotal {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+}
+.sr-subcat-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #E2E2EA;
+}
+.sr-subcat-note {
+    font-size: 11px;
+    color: #9292A6;
+    margin-left: 4px;
+}
+.sr-subcat-cap {
+    font-size: 11px;
+    font-weight: 700;
+    color: #FCBC00;
+    background: rgba(252, 188, 0, 0.12);
+    padding: 2px 7px;
+    border-radius: 6px;
+    border: 1px solid rgba(252, 188, 0, 0.30);
+    display: inline-block;
+}
+.sr-racing-sync-card {
+    background: linear-gradient(135deg, rgba(0, 159, 227, 0.12) 0%, rgba(49, 39, 131, 0.18) 100%);
+    border: 1px solid rgba(0, 159, 227, 0.45);
+    border-left: 5px solid #009FE3;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 18px;
+}
+.sr-grand-total-banner {
+    background: linear-gradient(135deg, rgba(230, 0, 126, 0.22) 0%, rgba(237, 109, 5, 0.20) 50%, rgba(252, 188, 0, 0.15) 100%);
+    border: 2px solid rgba(230, 0, 126, 0.65);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin: 20px 0;
+    box-shadow: 0 12px 38px rgba(230, 0, 126, 0.25);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+.sr-grand-total-score {
+    font-size: 34px;
+    font-weight: 900;
+    font-style: italic;
+    color: #FCBC00;
+    text-shadow: 0 0 18px rgba(252, 188, 0, 0.60);
+    letter-spacing: 0.5px;
+}
+.sr-matrix-table-wrap {
+    background: rgba(18, 14, 28, 0.90);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+    padding: 18px;
+    margin-top: 24px;
+    overflow-x: auto;
+}
 </style>"""
     return css
 
