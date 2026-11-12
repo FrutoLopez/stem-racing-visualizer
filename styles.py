@@ -699,6 +699,146 @@ input:disabled, .stTextInput input:disabled, div[data-baseweb="input"] input:dis
     margin-top: 24px;
     overflow-x: auto;
 }
+
+/* ==========================================================================
+   OFFICIAL EXCEL SCORECARD EXACT STYLES (Registro de Jurado)
+   ========================================================================== */
+.sr-excel-container {
+    max-width: 860px;
+    margin: 0 auto 16px auto;
+    border: 2px solid #808080;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #000000;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.75);
+    overflow: hidden;
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.sr-excel-meta-bar {
+    background: #F2F2F2;
+    border-bottom: 2px solid #888888;
+    padding: 9px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13.5px;
+    color: #111111;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.sr-excel-col-head {
+    display: flex;
+    background: #E8E8E8;
+    border-bottom: 1.5px solid #888888;
+    font-weight: 800;
+    font-size: 13px;
+    color: #111111;
+    letter-spacing: 0.3px;
+    align-items: center;
+}
+.sr-excel-yellow-head {
+    display: flex;
+    background: #FFFF00 !important;
+    color: #000000 !important;
+    font-weight: 800;
+    font-size: 13.5px;
+    border-top: 1px solid #777;
+    border-bottom: 1px solid #777;
+    align-items: center;
+}
+.sr-excel-red-head {
+    display: flex;
+    background: #FF0000 !important;
+    color: #FFFFFF !important;
+    font-weight: 800;
+    font-size: 14px;
+    border-top: 1.5px solid #555;
+    border-bottom: 1px solid #777;
+    align-items: center;
+}
+.sr-excel-black-head {
+    display: flex;
+    background: #000000 !important;
+    color: #FFFFFF !important;
+    font-weight: 900;
+    font-size: 15px;
+    border-top: 2px solid #000000;
+    align-items: center;
+}
+.sr-cell-c1 {
+    flex: 5.6;
+    padding: 7px 12px;
+    border-right: 1px solid rgba(0,0,0,0.18);
+    display: flex;
+    align-items: center;
+}
+.sr-cell-c2 {
+    flex: 2.4;
+    padding: 7px 10px;
+    text-align: center;
+    border-right: 1px solid rgba(0,0,0,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+.sr-cell-c3 {
+    flex: 2.0;
+    padding: 7px 10px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+}
+.sr-excel-row-item {
+    margin-bottom: -1px;
+}
+.sr-sub-c1-box {
+    background: #FFFFFF;
+    color: #1A1A1A;
+    font-weight: 500;
+    font-size: 13px;
+    padding: 4px 12px;
+    border: 1px solid #D0D0D0;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    border-radius: 2px;
+}
+.sr-sub-c2-box {
+    background: #D9D9D9;
+    color: #000000;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 4px 8px;
+    border: 1px solid #BFBFBF;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 2px;
+}
+.sr-sub-c3-box {
+    background: #FFFFFF;
+    color: #000000;
+    font-weight: 800;
+    font-size: 14px;
+    padding: 4px 8px;
+    border: 1px solid #D0D0D0;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 2px;
+}
+div[data-testid="stNumberInput"] input {
+    text-align: center !important;
+    font-weight: 800 !important;
+    font-size: 14px !important;
+}
 </style>"""
     return css
 

@@ -362,9 +362,9 @@ with st.sidebar:
     st.markdown("## 🧭 Pantalla Activa")
     screen_options = [
         "⏱️ Tiempos y Resultados en Pista",
-        "🏆 Ceremonia de Podio Oficial",
+        "🏆 Ceremonia de Podio",
         "📝 Pantalla de Edición y Registro",
-        "📋 Resumen de Evaluación (Judging Summary)"
+        "📝 Registro de Jurado"
     ]
     if "_pending_view_mode" in st.session_state and st.session_state._pending_view_mode in screen_options:
         st.session_state.app_view_mode = st.session_state._pending_view_mode
@@ -452,8 +452,8 @@ with st.sidebar:
         st.session_state["_last_uploaded_rubric_msgs"] = []
 
     with st.expander("✏️ Editar Puntajes de Jueces Manualmente"):
-        if st.button("📋 Abrir Pantalla Completa de Judging Summary", use_container_width=True, key="sidebar_goto_js_btn"):
-            st.session_state._pending_view_mode = "📋 Resumen de Evaluación (Judging Summary)"
+        if st.button("📝 Abrir Registro de Jurado", use_container_width=True, key="sidebar_goto_js_btn"):
+            st.session_state._pending_view_mode = "📝 Registro de Jurado"
             st.rerun()
         st.caption("Ajusta los puntajes evaluados por los jueces para el Podio General:")
         if st.session_state.custom_scores is not None:
@@ -604,7 +604,7 @@ def render_podium_intro_slide():
                 <div style="font-size: 40px; font-weight: 900; color: #ED6D05; margin-top: 2px;">990 <span style="font-size: 16px; color: #FFFFFF;">PTS</span></div>
             </div>
             <div style="background: rgba(25, 17, 50, 0.85); border: 2px solid #009FE3; border-radius: 16px; padding: 16px 36px; text-align: center; flex: 1; box-shadow: 0 8px 30px rgba(0, 159, 227, 0.2);">
-                <div style="font-size: 12px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Categorías Oficiales</div>
+                <div style="font-size: 12px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Categorías de Evaluación</div>
                 <div style="font-size: 40px; font-weight: 900; color: #009FE3; margin-top: 2px;">6 <span style="font-size: 16px; color: #FFFFFF;">ÁREAS</span></div>
             </div>
         </div>
@@ -773,8 +773,8 @@ if selected_view == "📝 Pantalla de Edición y Registro":
             st.rerun()
     with col_hdr_btn_js:
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        if st.button("📋 Judging Summary", use_container_width=True, key="hdr_goto_js_btn"):
-            st.session_state._pending_view_mode = "📋 Resumen de Evaluación (Judging Summary)"
+        if st.button("📝 Registro de Jurado", use_container_width=True, key="hdr_goto_js_btn"):
+            st.session_state._pending_view_mode = "📝 Registro de Jurado"
             st.rerun()
     with col_hdr_btn_exp:
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
@@ -809,9 +809,9 @@ if selected_view == "📝 Pantalla de Edición y Registro":
     matchup_labels = [m['label'] for m in matchups_list]
     if st.session_state.get("input_matchup_selector") not in matchup_labels:
         st.session_state["input_matchup_selector"] = matchup_labels[0]
-    st.markdown("<div style='font-size: 14px; font-weight: 700; color: #E6E4F0; margin-bottom: 6px;'>⚔️ Seleccionar Enfrentamiento Oficial:</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 14px; font-weight: 700; color: #E6E4F0; margin-bottom: 6px;'>⚔️ Seleccionar Enfrentamiento:</div>", unsafe_allow_html=True)
     selected_matchup_label = st.pills(
-        "Seleccionar Enfrentamiento Oficial:",
+        "Seleccionar Enfrentamiento:",
         options=matchup_labels,
         default=matchup_labels[0],
         key="input_matchup_selector",
@@ -1042,7 +1042,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                     <div style="font-size: 28px; margin-bottom: 6px;">🏁</div>
                     <div style="font-size: 14px; font-weight: 800; color: #FFFFFF; text-transform: uppercase; letter-spacing: 0.8px;">Carrera Individual</div>
                     <div style="font-size: 12px; color: #A09EB8; margin-top: 6px; line-height: 1.4;">
-                        <strong>{team_a}</strong> corre de forma individual en pista para todos los cálculos oficiales de puntuación (Tiempo de Carro y Tiempo Más Rápido).
+                        <strong>{team_a}</strong> corre de forma individual en pista para todos los cálculos de puntuación (Tiempo de Carro y Tiempo Más Rápido).
                     </div>
                 </div>""")
             elif b_fs:
@@ -1153,7 +1153,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                 <span style="font-size: 14px; color: #00F0FF; font-weight: 800;">{hist_title_right}</span>
             </div>
             <div style="font-size: 13px; color: #A09EB8; margin-top: 4px;">
-                Resumen de las 4 carreras oficiales registradas en pista.
+                Resumen de las 4 carreras registradas en pista.
             </div>
         </div>
         """)
@@ -1281,7 +1281,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
     render_html(f"""
     <div style="background: rgba(18, 12, 36, 0.7); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 18px 20px 10px 20px; margin-bottom: 16px;">
         <div style="font-size: 20px; font-weight: 900; color: #FFFFFF; display: flex; align-items: center; gap: 8px;">
-            <span>📋</span> Monitor General del Torneo ({len(official_teams)} Equipos Oficiales)
+            <span>📋</span> Monitor General del Torneo ({len(official_teams)} Equipos)
         </div>
         <div style="font-size: 13px; color: #A09EB8; margin-top: 4px;">
             Seguimiento en tiempo real de las 4 carreras de cada equipo, estado de DNF, False Starts, tiempo de carro y mejor tiempo total.
@@ -1393,9 +1393,9 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                 st.toast("✅ Tiempos totales recalculados.")
                 st.rerun()
 
-elif selected_view == "🏆 Ceremonia de Podio Oficial":
+elif selected_view == "🏆 Ceremonia de Podio":
     # -------------------------------------------------------------------------
-    # PANTALLA EXCLUSIVA DE CEREMONIA DE PODIO OFICIAL
+    # PANTALLA EXCLUSIVA DE CEREMONIA DE PODIO
     # Sin encabezado superior, sin pestañas, sin indicador de pasos.
     # Máximo espacio y protagonismo para la ceremonia.
     # -------------------------------------------------------------------------
@@ -1448,217 +1448,182 @@ elif selected_view == "🏆 Ceremonia de Podio Oficial":
     else:
         render_podium_full_slide()
 
-elif selected_view == "📋 Resumen de Evaluación (Judging Summary)":
+elif selected_view == "📝 Registro de Jurado":
     # -------------------------------------------------------------------------
-    # PANTALLA DE RESUMEN DE EVALUACIÓN (JUDGING SUMMARY - 990 PTS BREAKDOWN)
+    # PANTALLA: REGISTRO DE JURADO (HOJA OFICIAL DE EVALUACIÓN POR EQUIPO)
     # -------------------------------------------------------------------------
     live_visualizer_sync_watcher()
     render_html(styles.render_app_header(logo_b64))
 
-    # Top banner with title and explanation
+    # Clean, simple title
     render_html("""
-    <div class="sr-judging-panel">
-        <div class="sr-judging-header-badge">📋 Hoja de Evaluación Oficial</div>
-        <h1 class="sr-judging-title">STEM RACING — COMPETITION JUDGING BREAKDOWN</h1>
-        <div class="sr-judging-subtitle">
-            Registro oficial y desglose detallado de las 5 categorías evaluadas por jueces (770 pts) y sincronización con puntos de carrera (220 pts) para el puntaje global de campeonato (990 pts).
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="font-size: 26px; font-weight: 900; font-style: italic; color: #FFFFFF; margin: 0; letter-spacing: 0.5px;">
+            📝 Registro de Jurado
+        </h2>
+        <div style="font-size: 13.5px; color: #A0A0B5; margin-top: 5px;">
+            Ingresa y edita los puntos de jurado para cada equipo (770 pts jurado + 220 pts carrera = 990 pts total). Coincide con la plantilla de Excel.
         </div>
     </div>
     """)
 
-    # Team selection and switcher bar
+    # Team selector bar: compact and centered
     if "judging_summary_team_idx" not in st.session_state:
         st.session_state.judging_summary_team_idx = 0
     if st.session_state.judging_summary_team_idx >= len(official_teams):
         st.session_state.judging_summary_team_idx = 0
 
-    col_nav_prev, col_team_sel, col_nav_next = st.columns([1.1, 3.8, 1.1])
-    with col_nav_prev:
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-        if st.button("⬅️ Equipo Anterior", use_container_width=True, key="js_btn_prev_team"):
+    _, col_tnav_prev, col_tsel, col_tnav_next, _ = st.columns([0.6, 1.2, 4.4, 1.2, 0.6], vertical_alignment="center")
+    with col_tnav_prev:
+        if st.button("⬅️ Anterior", use_container_width=True, key="reg_jurado_prev_btn"):
             st.session_state.judging_summary_team_idx = (st.session_state.judging_summary_team_idx - 1) % len(official_teams)
             st.rerun()
-    with col_team_sel:
+    with col_tsel:
         selected_team = st.selectbox(
-            "Seleccionar Equipo para Evaluar:",
+            "Seleccionar Equipo:",
             options=official_teams,
             index=st.session_state.judging_summary_team_idx,
-            key="js_selected_team_dropdown",
+            key="reg_jurado_sel_team",
             format_func=lambda t: f"Equipo #{official_teams.index(t)+1}: {t}  —  {dp.TEAM_TO_SCHOOL_MAP.get(t, '')}",
             label_visibility="collapsed"
         )
         if selected_team != official_teams[st.session_state.judging_summary_team_idx]:
             st.session_state.judging_summary_team_idx = official_teams.index(selected_team)
             st.rerun()
-    with col_nav_next:
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-        if st.button("Siguiente Equipo ➡️", use_container_width=True, key="js_btn_next_team"):
+    with col_tnav_next:
+        if st.button("Siguiente ➡️", use_container_width=True, key="reg_jurado_next_btn"):
             st.session_state.judging_summary_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
             st.rerun()
 
-    # Team identity card
+    # Get team data
     team_num = official_teams.index(selected_team) + 1
-    school_name = dp.TEAM_TO_SCHOOL_MAP.get(selected_team, "Colegio no registrado")
-    t_logo_html = team_logo_only(selected_team, height=48)
-
-    # Get current team record from custom_scores
+    school_name = dp.TEAM_TO_SCHOOL_MAP.get(selected_team, "")
     t_mask = st.session_state.custom_scores['team'] == selected_team
     team_row = st.session_state.custom_scores[t_mask].iloc[0]
-    t_rank = int(team_row.get('rank', team_num))
-    t_total = float(team_row.get('Total', 0.0))
 
-    render_html(f"""
-    <div style="background: rgba(30, 24, 46, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 14px 20px; margin-bottom: 22px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; box-shadow: 0 4px 18px rgba(0,0,0,0.35);">
-        <div style="display: flex; align-items: center; gap: 16px;">
-            {t_logo_html}
-            <div>
-                <div style="font-size: 22px; font-weight: 800; color: #FFFFFF; font-style: italic;">{selected_team}</div>
-                <div style="font-size: 13px; color: #FCBC00; font-weight: 600;">🏫 {school_name} &nbsp;|&nbsp; 🔢 Equipo #{team_num}</div>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 18px;">
-            <div style="text-align: right;">
-                <div style="font-size: 11px; color: #A0A0B5; text-transform: uppercase; font-weight: 700;">Posición General</div>
-                <div style="font-size: 20px; font-weight: 900; color: #E6007E;">#{t_rank} <span style="font-size: 13px; color: #A0A0B5;">de {len(official_teams)}</span></div>
-            </div>
-            <div style="text-align: right; border-left: 1px solid rgba(255, 255, 255, 0.15); padding-left: 18px;">
-                <div style="font-size: 11px; color: #A0A0B5; text-transform: uppercase; font-weight: 700;">Puntos Totales</div>
-                <div style="font-size: 20px; font-weight: 900; color: #FCBC00;">{t_total:.1f} <span style="font-size: 13px; color: #A0A0B5;">/ 990 pts</span></div>
-            </div>
-        </div>
-    </div>
-    """)
-
-    # Current team subcategory values
     cur_subcats = {}
     for sub_k in dp.ALL_SUBCATEGORY_KEYS:
         val = team_row.get(sub_k)
         cur_subcats[sub_k] = float(val) if pd.notna(val) else 0.0
 
-    # Two column layout: Left (5 categories breakdown) | Right (Racing + Grand Total + Actions)
-    col_breakdown, col_summary = st.columns([1.55, 1.0])
+    # Racing points from track
+    tt_pts = float(pts_race_map.get(selected_team, 0.0))
+    rr_pts = float(pts_tot_map.get(selected_team, 0.0))
+    racing_subtotal = float(racing_pts_map.get(selected_team, 0.0))
 
-    new_subcat_inputs = {}
+    # Center the scorecard box
+    _, col_scorecard, _ = st.columns([0.4, 6.2, 0.4])
 
-    with col_breakdown:
-        st.markdown("### 📋 Desglose de Evaluación por Categorías (770 pts máx)")
+    with col_scorecard:
+        # 1. Top Metadata Bar (Team Number, Team Name, School)
+        render_html(f"""
+        <div style="background: #F2F2F2; color: #000; border: 1.5px solid #888; border-bottom: none; border-radius: 4px 4px 0 0; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; font-family: 'Montserrat', sans-serif;">
+            <div style="flex: 1;"><strong>Team Number:</strong> <span style="font-weight: 900; color: #000; margin-left: 6px;">{team_num}</span></div>
+            <div style="flex: 1.5; text-align: center;"><strong>Team Name:</strong> <span style="font-weight: 900; color: #000; margin-left: 6px;">{selected_team}</span></div>
+            <div style="flex: 1.8; text-align: right;"><strong>School:</strong> <span style="font-weight: 900; color: #000; margin-left: 6px;">{school_name}</span></div>
+        </div>
+        <div style="display: flex; background: #E8E8E8; color: #000; font-weight: 800; font-size: 13.5px; border: 1.5px solid #888; border-bottom: 2px solid #666; align-items: center; text-transform: uppercase; font-family: 'Montserrat', sans-serif;">
+            <div style="flex: 5.6; padding: 9px 12px; border-right: 1.5px solid #888;">Judging Category / Assessment Area</div>
+            <div style="flex: 2.4; padding: 9px 10px; text-align: center; border-right: 1.5px solid #888;">Points Available</div>
+            <div style="flex: 2.0; padding: 9px 10px; text-align: center;">Awarded Points</div>
+        </div>
+        """)
 
+        new_subcat_inputs = {}
+
+        # Loop through categories
         for cat_cfg in dp.JUDGING_BREAKDOWN_CONFIG:
             cat_name = cat_cfg["category"]
             cat_off_label = cat_cfg["official_label"]
             cat_max = cat_cfg["max_points"]
-            cat_color = cat_cfg["color"]
 
-            with st.container():
-                st.markdown(f"""
-                <div class="sr-judging-cat-box" style="border-left-color: {cat_color};">
-                    <div class="sr-judging-cat-head">
-                        <div>
-                            <span class="sr-judging-cat-name">{cat_name}</span>
-                            <div style="font-size: 11px; color: #9A9AA8; font-style: normal; margin-top: 2px;">{cat_off_label}</div>
-                        </div>
-                        <span class="sr-judging-cat-subtotal" style="background: rgba(255,255,255,0.06); border: 1px solid {cat_color}55; color: {cat_color};">
-                            Máx: {cat_max} pts
-                        </span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+            # Calculate live sum for this category
+            cat_current_sum = 0.0
+            for sub_item in cat_cfg["subcategories"]:
+                s_key = sub_item["key"]
+                input_key = f"rj_{selected_team}_{s_key}"
+                if input_key in st.session_state:
+                    cat_current_sum += float(st.session_state[input_key])
+                else:
+                    cat_current_sum += float(cur_subcats.get(s_key, 0.0))
 
-                sub_cols = st.columns(len(cat_cfg["subcategories"])) if len(cat_cfg["subcategories"]) > 1 else [st.container()]
-                cat_current_sum = 0.0
-                for s_idx, sub_item in enumerate(cat_cfg["subcategories"]):
-                    s_key = sub_item["key"]
-                    s_label = sub_item["label"]
-                    s_max = sub_item["max_points"]
-                    s_step = sub_item.get("step", 1)
+            # Yellow Category Header Row
+            render_html(f"""
+            <div style="display: flex; background: #FFFF00; color: #000; font-weight: 800; font-size: 14px; border: 1.5px solid #888; border-top: 1.5px solid #666; border-bottom: 1.5px solid #666; align-items: center; font-family: 'Montserrat', sans-serif; margin-bottom: 3px;">
+                <div style="flex: 5.6; padding: 8px 12px; border-right: 1.5px solid #888;">{cat_off_label}</div>
+                <div style="flex: 2.4; padding: 8px 10px; text-align: center; border-right: 1.5px solid #888;">{cat_max} points</div>
+                <div style="flex: 2.0; padding: 8px 10px; text-align: center; font-size: 15px;">{min(float(cat_max), cat_current_sum):.0f}</div>
+            </div>
+            """)
 
-                    target_col = sub_cols[s_idx]
-                    with target_col:
-                        val_input = st.number_input(
-                            f"{s_label} (Máx: {s_max})",
-                            min_value=0.0,
-                            max_value=float(s_max),
-                            value=float(min(float(s_max), max(0.0, cur_subcats.get(s_key, 0.0)))),
-                            step=float(s_step),
-                            format="%.1f",
-                            key=f"input_{selected_team}_{s_key}",
-                            help=f"Puntaje otorgado para {s_label}. Límite máximo oficial: {s_max} puntos."
-                        )
-                        new_subcat_inputs[s_key] = val_input
-                        cat_current_sum += val_input
+            # Subcategory rows
+            for sub_item in cat_cfg["subcategories"]:
+                s_key = sub_item["key"]
+                s_label = sub_item["label"]
+                s_max = sub_item["max_points"]
+                s_step = sub_item.get("step", 1)
 
-                cat_pct = min(1.0, max(0.0, cat_current_sum / float(cat_max)))
-                st.caption(f"Subtotal **{cat_name}**: **{cat_current_sum:.1f}** de {cat_max} pts ({cat_pct*100:.1f}%)")
-                st.progress(cat_pct)
-                st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+                c_sub1, c_sub2, c_sub3 = st.columns([5.6, 2.4, 2.0], gap="small", vertical_alignment="center")
+                with c_sub1:
+                    render_html(f'<div class="sr-sub-c1-box">{s_label}</div>')
+                with c_sub2:
+                    render_html(f'<div class="sr-sub-c2-box">{s_max} points</div>')
+                with c_sub3:
+                    val_input = st.number_input(
+                        f"{s_label}",
+                        min_value=0.0,
+                        max_value=float(s_max),
+                        value=float(min(float(s_max), max(0.0, cur_subcats.get(s_key, 0.0)))),
+                        step=float(s_step),
+                        format="%.0f",
+                        label_visibility="collapsed",
+                        key=f"rj_{selected_team}_{s_key}"
+                    )
+                    new_subcat_inputs[s_key] = val_input
 
-    with col_summary:
-        st.markdown("### 🏎️ Puntos de Carrera y Total")
-
-        # 1. Racing Points Card (220 pts)
-        tt_pts = float(pts_race_map.get(selected_team, 0.0))
-        rr_pts = float(pts_tot_map.get(selected_team, 0.0))
-        racing_subtotal = float(racing_pts_map.get(selected_team, 0.0))
-        racing_pct = min(1.0, max(0.0, racing_subtotal / 220.0))
-
+        # Red Racing Row (220 pts)
         render_html(f"""
-        <div class="sr-racing-sync-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span style="font-size: 15px; font-weight: 800; font-style: italic; color: #009FE3;">
-                    🏁 Carrera en Pista (Racing)
-                </span>
-                <span style="font-size: 13px; font-weight: 800; color: #009FE3; background: rgba(0,159,227,0.18); padding: 3px 10px; border-radius: 10px; border: 1px solid rgba(0,159,227,0.4);">
-                    {racing_subtotal:.1f} / 220 pts
-                </span>
-            </div>
-            <div style="font-size: 12px; color: #C5D1E0; margin-bottom: 6px;">
-                ⏱️ <strong>Time Trials (TT):</strong> {tt_pts:.1f} / 110 pts<br/>
-                ⚡ <strong>Reaction Racing (RR):</strong> {rr_pts:.1f} / 110 pts
-            </div>
-            <div style="font-size: 11px; color: #10B981; font-weight: 600;">
-                🟢 Sincronizado en vivo con los tiempos de pista
-            </div>
+        <div style="display: flex; background: #FF0000; color: #FFF; font-weight: 800; font-size: 14px; border: 1.5px solid #888; border-top: 2px solid #555; border-bottom: 1.5px solid #777; align-items: center; font-family: 'Montserrat', sans-serif; margin-top: 4px; margin-bottom: 3px;">
+            <div style="flex: 5.6; padding: 8px 12px; border-right: 1.5px solid #FFF;">Racing</div>
+            <div style="flex: 2.4; padding: 8px 10px; text-align: center; border-right: 1.5px solid #FFF;">220 points</div>
+            <div style="flex: 2.0; padding: 8px 10px; text-align: center; font-size: 15px;">{racing_subtotal:.1f}</div>
         </div>
         """)
-        st.progress(racing_pct)
-        st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
 
-        # 2. Grand Total Card (990 pts)
+        # Racing sub-rows: Time Trials & Reaction Racing
+        c_r1, c_r2, c_r3 = st.columns([5.6, 2.4, 2.0], gap="small", vertical_alignment="center")
+        with c_r1:
+            render_html('<div class="sr-sub-c1-box">Time Trials</div>')
+        with c_r2:
+            render_html('<div class="sr-sub-c2-box">110 points</div>')
+        with c_r3:
+            render_html(f'<div class="sr-sub-c3-box">{tt_pts:.1f}</div>')
+
+        c_rx1, c_rx2, c_rx3 = st.columns([5.6, 2.4, 2.0], gap="small", vertical_alignment="center")
+        with c_rx1:
+            render_html('<div class="sr-sub-c1-box">Reaction Racing</div>')
+        with c_rx2:
+            render_html('<div class="sr-sub-c2-box">110 points</div>')
+        with c_rx3:
+            render_html(f'<div class="sr-sub-c3-box">{rr_pts:.1f}</div>')
+
+        # Black TOTAL Row (990 pts)
         live_non_racing_sum = sum(new_subcat_inputs.values())
-        live_grand_total = round(live_non_racing_sum + racing_subtotal, 2)
-        total_pct = min(1.0, max(0.0, live_grand_total / 990.0))
+        live_grand_total = round(live_non_racing_sum + racing_subtotal, 1)
 
         render_html(f"""
-        <div class="sr-grand-total-banner">
-            <div>
-                <div style="font-size: 12px; color: #FFD480; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
-                    TOTAL COMPETENCIA (990 PTS)
-                </div>
-                <div class="sr-grand-total-score">
-                    {live_grand_total:.1f} <span style="font-size: 16px; color: #E0E0E0; font-weight: 600; text-shadow: none;">/ 990</span>
-                </div>
-                <div style="font-size: 12px; color: #FFFFFF; margin-top: 4px;">
-                    📋 Jueces: <strong>{live_non_racing_sum:.1f}</strong> / 770 pts &nbsp;|&nbsp; 🏎️ Pista: <strong>{racing_subtotal:.1f}</strong> / 220 pts
-                </div>
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 28px; font-weight: 900; color: #E6007E;">
-                    {total_pct * 100:.1f}%
-                </div>
-                <div style="font-size: 11px; color: #A0A0B5;">
-                    del puntaje máximo
-                </div>
-            </div>
+        <div style="display: flex; background: #000000; color: #FFF; font-weight: 900; font-size: 15px; border: 2px solid #000; border-radius: 0 0 4px 4px; align-items: center; font-family: 'Montserrat', sans-serif; margin-top: 4px;">
+            <div style="flex: 5.6; padding: 10px 12px; border-right: 1.5px solid #444;">TOTAL</div>
+            <div style="flex: 2.4; padding: 10px 10px; text-align: center; border-right: 1.5px solid #444;">990 points</div>
+            <div style="flex: 2.0; padding: 10px 10px; text-align: center; font-size: 18px; color: #FCBC00;">{live_grand_total:.1f}</div>
         </div>
         """)
-        st.progress(total_pct)
-        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
-        # 3. Action Buttons for this team
-        st.markdown("#### ⚡ Acciones del Equipo")
+        st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
 
-        def apply_team_subcategories_and_save(target_team: str, subcats_dict: dict):
-            mask = st.session_state.custom_scores['team'] == target_team
+        # Action Buttons right below the cuadro
+        def save_team_scores(team_name: str, subcats_dict: dict):
+            mask = st.session_state.custom_scores['team'] == team_name
             if mask.any():
                 for k, v in subcats_dict.items():
                     st.session_state.custom_scores.loc[mask, k] = v
@@ -1667,131 +1632,52 @@ elif selected_view == "📋 Resumen de Evaluación (Judging Summary)":
                     st.session_state.custom_scores.loc[mask, c_col] = c_val
                 save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
 
-        if st.button(f"💾 Guardar Puntajes de {selected_team}", type="primary", use_container_width=True, key="js_btn_save_team"):
-            apply_team_subcategories_and_save(selected_team, new_subcat_inputs)
-            st.toast(f"✅ Puntajes de {selected_team} guardados ({live_grand_total:.1f} / 990 pts).")
-            st.rerun()
-
-        if st.button("💾 Guardar y Pasar al Siguiente Equipo ➡️", use_container_width=True, key="js_btn_save_and_next"):
-            apply_team_subcategories_and_save(selected_team, new_subcat_inputs)
-            st.session_state.judging_summary_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
-            st.toast(f"✅ {selected_team} guardado. Pasando al siguiente equipo...")
-            st.rerun()
-
-        col_act1, col_act2 = st.columns(2)
-        with col_act1:
-            if st.button("🎲 Test Aleatorio", use_container_width=True, key="js_btn_random_team", help="Genera puntajes aleatorios de prueba realistas para las 12 subcategorías de este equipo."):
-                rnd_sub = dp.generate_random_subcategories_for_team()
-                apply_team_subcategories_and_save(selected_team, rnd_sub)
-                st.toast(f"🎲 Puntajes aleatorios generados para {selected_team}.")
+        col_b1, col_b2, col_b3, col_b4 = st.columns([1.5, 1.6, 1.2, 1.1])
+        with col_b1:
+            if st.button(f"💾 Guardar {selected_team}", type="primary", use_container_width=True, key="rj_save_team_btn"):
+                save_team_scores(selected_team, new_subcat_inputs)
+                st.toast(f"✅ Puntajes de {selected_team} guardados ({live_grand_total:.1f} / 990 pts).")
                 st.rerun()
-        with col_act2:
-            if st.button("🔄 Poner en 0", use_container_width=True, key="js_btn_zero_team", help="Reinicia todas las 12 subcategorías a 0 para este equipo."):
+        with col_b2:
+            if st.button("💾 Guardar y Siguiente ➡️", use_container_width=True, key="rj_save_next_btn"):
+                save_team_scores(selected_team, new_subcat_inputs)
+                st.session_state.judging_summary_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
+                st.toast(f"✅ {selected_team} guardado. Pasando al siguiente equipo...")
+                st.rerun()
+        with col_b3:
+            if st.button("🎲 Datos de Prueba", use_container_width=True, key="rj_rnd_team_btn", help="Genera puntajes de prueba para este equipo."):
+                rnd_sub = dp.generate_random_subcategories_for_team()
+                save_team_scores(selected_team, rnd_sub)
+                st.toast(f"🎲 Datos de prueba generados para {selected_team}.")
+                st.rerun()
+        with col_b4:
+            if st.button("🔄 Reiniciar a 0", use_container_width=True, key="rj_zero_team_btn", help="Pone las subcategorías de este equipo en 0."):
                 zero_sub = {k: 0.0 for k in dp.ALL_SUBCATEGORY_KEYS}
-                apply_team_subcategories_and_save(selected_team, zero_sub)
-                st.toast(f"🗑️ Puntajes de {selected_team} reiniciados a 0.")
+                save_team_scores(selected_team, zero_sub)
+                st.toast(f"🗑️ Subcategorías de {selected_team} en 0.")
                 st.rerun()
 
-    # Full Overview Matrix Section (all teams table)
-    st.markdown("---")
-    st.markdown("### 📊 Tabla Resumen Oficial de Evaluación (Judging Breakdown Matrix)")
-    st.caption("Visualiza y compara el desglose de los 990 puntos de competencia para todos los equipos participantes.")
-
-    matrix_rows = []
-    for t_idx, row in st.session_state.custom_scores.iterrows():
-        t_n = str(row['team'])
-        matrix_rows.append({
-            "Pos": int(row.get('rank', t_idx + 1)),
-            "Equipo": t_n,
-            "Colegio": dp.TEAM_TO_SCHOOL_MAP.get(t_n, ""),
-            "Escrutinio (170)": round(float(row.get('Especificaciones y Escrutinio', 0.0)), 1),
-            "Diseño (180)": round(float(row.get('Diseño e Ingeniería', 0.0)), 1),
-            "Gestión (160)": round(float(row.get('Gestión de Proyecto', 0.0)), 1),
-            "Verbal (160)": round(float(row.get('Presentación Verbal', 0.0)), 1),
-            "Marca (100)": round(float(row.get('Identidad de Marca', 0.0)), 1),
-            "Subtotal Jueces (770)": round(float(row.get('Especificaciones y Escrutinio', 0.0) + row.get('Diseño e Ingeniería', 0.0) + row.get('Gestión de Proyecto', 0.0) + row.get('Presentación Verbal', 0.0) + row.get('Identidad de Marca', 0.0)), 1),
-            "Carrera (220)": round(float(row.get('Carrera', 0.0)), 1),
-            "TOTAL (990)": round(float(row.get('Total', 0.0)), 1),
-        })
-
-    df_matrix = pd.DataFrame(matrix_rows)
-    st.dataframe(
-        df_matrix,
-        hide_index=True,
-        use_container_width=True,
-        column_config={
-            "Pos": st.column_config.NumberColumn("Pos", width="small"),
-            "Equipo": st.column_config.TextColumn("Equipo", width="medium"),
-            "Colegio": st.column_config.TextColumn("Colegio", width="large"),
-            "TOTAL (990)": st.column_config.NumberColumn("TOTAL (990 pts)", format="%.1f pts", width="medium"),
-            "Carrera (220)": st.column_config.NumberColumn("Carrera (220 pts)", format="%.1f pts"),
-            "Subtotal Jueces (770)": st.column_config.NumberColumn("Jueces (770 pts)", format="%.1f pts"),
-        }
-    )
-
-    # Matrix Bulk Tools & Export
-    col_mat_exp, col_mat_rnd, col_mat_zero = st.columns([1.5, 1.2, 1.2])
-    with col_mat_exp:
-        export_csv_bytes = st.session_state.custom_scores.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="📥 Descargar Judging Summary (.csv)",
-            data=export_csv_bytes,
-            file_name=f"judging_summary_stem_racing_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-            use_container_width=True,
-            key="js_export_summary_csv"
-        )
-    with col_mat_rnd:
-        if st.button("🎲 Generar Aleatorios para TODOS", use_container_width=True, key="js_btn_rnd_all"):
-            for t_n in official_teams:
-                rnd_sub = dp.generate_random_subcategories_for_team()
-                mask = st.session_state.custom_scores['team'] == t_n
-                for k, v in rnd_sub.items():
-                    st.session_state.custom_scores.loc[mask, k] = v
-                cat_computed = dp.compute_category_totals_from_subcategories(rnd_sub)
-                for c_col, c_val in cat_computed.items():
-                    st.session_state.custom_scores.loc[mask, c_col] = c_val
-            save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
-            st.toast("🎲 Puntajes aleatorios generados para todos los equipos.")
-            st.rerun()
-    with col_mat_zero:
-        if st.button("🔄 Reiniciar TODOS en 0", use_container_width=True, key="js_btn_zero_all"):
-            for t_n in official_teams:
-                mask = st.session_state.custom_scores['team'] == t_n
-                for k in dp.ALL_SUBCATEGORY_KEYS:
-                    st.session_state.custom_scores.loc[mask, k] = 0.0
-                for c in dp.NON_RACING_CATEGORIES:
-                    st.session_state.custom_scores.loc[mask, c] = 0.0
-            save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
-            st.toast("🗑️ Todos los puntajes de jueces reiniciados en 0.")
-            st.rerun()
-
-    # Upload rubrics inside this screen as well
-    with st.expander("📤 Cargar Archivos de Evaluación Oficiales (.xlsx / .csv)"):
-        st.caption("Arrastra aquí los archivos de evaluación oficiales de STEM Racing (por equipo o consolidados).")
-        uploaded_js_files = st.file_uploader(
-            "Seleccionar archivos (.xlsx / .csv):",
-            type=["xlsx", "csv"],
-            accept_multiple_files=True,
-            key="js_rubric_file_uploader"
-        )
-        if uploaded_js_files:
-            js_sig = "|".join(f"{f.name}_{f.size}" for f in uploaded_js_files)
-            if st.session_state.get("_last_js_uploaded_sig") != js_sig or st.button("🔄 Aplicar Archivos Cargados", use_container_width=True, key="js_apply_uploaded_btn"):
-                parsed_scores, parse_msgs = dp.parse_judging_rubric_files(uploaded_js_files, official_teams)
-                st.session_state["_last_js_uploaded_sig"] = js_sig
-                if parsed_scores:
-                    for t_name, vals in parsed_scores.items():
-                        t_m = st.session_state.custom_scores['team'] == t_name
-                        if t_m.any():
-                            for k, v in vals.items():
-                                if k in st.session_state.custom_scores.columns or k in dp.ALL_SUBCATEGORY_KEYS or k in dp.NON_RACING_CATEGORIES:
-                                    st.session_state.custom_scores.loc[t_m, k] = v
-                    save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
-                    st.toast(f"✅ Puntajes cargados para {len(parsed_scores)} equipo(s).")
-                    st.rerun()
-                for msg in parse_msgs:
-                    st.info(msg)
+    # Expandable Summary Table at bottom
+    with st.expander("📊 Ver Tabla Resumen de Todos los Equipos y Exportar CSV"):
+        matrix_rows = []
+        for t_idx, row in st.session_state.custom_scores.iterrows():
+            t_n = str(row['team'])
+            matrix_rows.append({
+                "Pos": int(row.get('rank', t_idx + 1)),
+                "Equipo": t_n,
+                "Colegio": dp.TEAM_TO_SCHOOL_MAP.get(t_n, ""),
+                "Escrutinio (170)": round(float(row.get('Especificaciones y Escrutinio', 0.0)), 1),
+                "Diseño (180)": round(float(row.get('Diseño e Ingeniería', 0.0)), 1),
+                "Gestión (160)": round(float(row.get('Gestión de Proyecto', 0.0)), 1),
+                "Verbal (160)": round(float(row.get('Presentación Verbal', 0.0)), 1),
+                "Marca (100)": round(float(row.get('Identidad de Marca', 0.0)), 1),
+                "Subtotal Jueces (770)": round(float(row.get('Especificaciones y Escrutinio', 0.0) + row.get('Diseño e Ingeniería', 0.0) + row.get('Gestión de Proyecto', 0.0) + row.get('Presentación Verbal', 0.0) + row.get('Identidad de Marca', 0.0)), 1),
+                "Carrera (220)": round(float(row.get('Carrera', 0.0)), 1),
+                "TOTAL (990)": round(float(row.get('Total', 0.0)), 1),
+            })
+        st.dataframe(pd.DataFrame(matrix_rows), hide_index=True, use_container_width=True)
+        exp_csv = st.session_state.custom_scores.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Descargar CSV de Jurado", data=exp_csv, file_name=f"registro_jurado_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", mime="text/csv", key="rj_dl_csv")
 
 else:
     # -------------------------------------------------------------------------
@@ -1817,7 +1703,7 @@ else:
                 Tiempos por Equipos
             </h2>
             <div style="color: #A09EB8; font-size: 15px; margin-top: 6px;">
-                Mejor Tiempo Total (Reacción + Carrera) y Tiempo de Carro (Promedio 2do y 3er mejor tiempo) en orden oficial de equipos
+                Mejor Tiempo Total (Reacción + Carrera) y Tiempo de Carro (Promedio 2do y 3er mejor tiempo) en orden de equipos
             </div>
         </div>
         """)
@@ -1885,9 +1771,9 @@ else:
         h2h_matchup_labels = [m['label'] for m in matchups_list]
         if st.session_state.get("slide3_matchup_selector") not in h2h_matchup_labels:
             st.session_state["slide3_matchup_selector"] = h2h_matchup_labels[0]
-        st.markdown("<div style='font-size: 14px; font-weight: 700; color: #E6E4F0; margin-bottom: 6px;'>⚔️ Seleccionar Enfrentamiento Oficial:</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 14px; font-weight: 700; color: #E6E4F0; margin-bottom: 6px;'>⚔️ Seleccionar Enfrentamiento:</div>", unsafe_allow_html=True)
         selected_h2h_label = st.pills(
-            "Seleccionar Enfrentamiento Oficial:",
+            "Seleccionar Enfrentamiento:",
             options=h2h_matchup_labels,
             default=h2h_matchup_labels[0],
             key="slide3_matchup_selector",
