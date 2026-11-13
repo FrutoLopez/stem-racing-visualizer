@@ -422,7 +422,7 @@ with st.sidebar:
         data=csv_bytes_sidebar,
         file_name=f"carreras_stem_racing_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv",
-        use_container_width=True,
+        width="stretch",
         key="sidebar_export_csv_btn",
         help="Descarga una copia del archivo CSV con todos los registros e historial de timestamps."
     )
@@ -436,7 +436,7 @@ with st.sidebar:
     if uploaded_race_csv is not None:
         file_sig = f"{uploaded_race_csv.name}_{uploaded_race_csv.size}"
         auto_loaded = st.session_state.get("_last_uploaded_race_csv_sig") != file_sig
-        reload_clicked = st.button("🔄 Recargar CSV Subido", use_container_width=True, key="reload_uploaded_csv_btn")
+        reload_clicked = st.button("🔄 Recargar CSV Subido", width="stretch", key="reload_uploaded_csv_btn")
         if auto_loaded or reload_clicked:
             uploaded_race_csv.seek(0)
             loaded_csv_df = dp.load_runs_from_csv(uploaded_race_csv)
@@ -461,7 +461,7 @@ with st.sidebar:
     if uploaded_rubric_files:
         rubric_sig = "|".join(f"{f.name}_{f.size}" for f in uploaded_rubric_files)
         auto_load_rubric = st.session_state.get("_last_uploaded_rubric_sig") != rubric_sig
-        reload_rubric_btn = st.button("🔄 Recargar Puntajes de Archivo(s)", use_container_width=True, key="reload_rubric_btn")
+        reload_rubric_btn = st.button("🔄 Recargar Puntajes de Archivo(s)", width="stretch", key="reload_rubric_btn")
         if auto_load_rubric or reload_rubric_btn:
             parsed_scores, parse_msgs = dp.parse_judging_rubric_files(uploaded_rubric_files, official_teams)
             st.session_state["_last_uploaded_rubric_msgs"] = parse_msgs
@@ -482,7 +482,7 @@ with st.sidebar:
         st.session_state["_last_uploaded_rubric_msgs"] = []
 
     with st.expander("✏️ Editar Puntajes de Jueces Manualmente"):
-        if st.button("📝 Abrir Registro de Jurado", use_container_width=True, key="sidebar_goto_js_btn"):
+        if st.button("📝 Abrir Registro de Jurado", width="stretch", key="sidebar_goto_js_btn"):
             st.session_state._pending_view_mode = "📝 Registro de Jurado"
             st.rerun()
         st.caption("Ajusta los puntajes evaluados por los jueces para el Podio General:")
@@ -490,10 +490,10 @@ with st.sidebar:
             edited_rubric = st.data_editor(
                 st.session_state.custom_scores[['team', 'Identidad de Marca', 'Presentación Verbal', 'Especificaciones y Escrutinio', 'Diseño e Ingeniería', 'Gestión de Proyecto']],
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
                 key="rubric_editor"
             )
-            if st.button("💾 Guardar Puntajes de Jueces", use_container_width=True):
+            if st.button("💾 Guardar Puntajes de Jueces", width="stretch"):
                 for col in dp.NON_RACING_CATEGORIES:
                     st.session_state.custom_scores[col] = pd.to_numeric(edited_rubric[col], errors='coerce').fillna(0.0).clip(
                         lower=0.0, upper=float(dp.CATEGORY_MAX_POINTS.get(col, 200))
@@ -501,7 +501,7 @@ with st.sidebar:
                 save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
                 st.toast("✅ Puntajes de jueces guardados.")
                 st.rerun()
-            if st.button("🔄 Poner Puntajes de Jueces en 0", use_container_width=True):
+            if st.button("🔄 Poner Puntajes de Jueces en 0", width="stretch"):
                 zero_df = dp.get_default_category_scores(official_teams, racing_pts_map, zero_init=True)
                 save_and_sync_judge_scores(zero_df, racing_pts_map)
                 st.toast("🗑️ Puntajes de jueces reiniciados en 0.")
@@ -865,12 +865,12 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         """)
     with col_hdr_btn1:
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        if st.button("📺 Ir al Visualizador", use_container_width=True):
+        if st.button("📺 Ir al Visualizador", width="stretch"):
             st.session_state._pending_view_mode = "⏱️ Tiempos y Resultados en Pista"
             st.rerun()
     with col_hdr_btn_js:
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        if st.button("📝 Registro de Jurado", use_container_width=True, key="hdr_goto_js_btn"):
+        if st.button("📝 Registro de Jurado", width="stretch", key="hdr_goto_js_btn"):
             st.session_state._pending_view_mode = "📝 Registro de Jurado"
             st.rerun()
     with col_hdr_btn_exp:
@@ -881,7 +881,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
             data=export_df_hdr.to_csv(index=False).encode("utf-8"),
             file_name=f"carreras_stem_racing_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
             key="hdr_export_csv_btn"
         )
     @st.dialog("⚠️ Confirmar Borrado de Registros")
@@ -889,17 +889,17 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         st.warning("¿Estás seguro de que deseas borrar **todos los registros** de carreras? Esta acción vaciará los tiempos actuales y el archivo CSV activo para empezar desde 0.")
         col_conf_yes, col_conf_no = st.columns(2)
         with col_conf_yes:
-            if st.button("✅ Sí, borrar todo", type="primary", use_container_width=True):
+            if st.button("✅ Sí, borrar todo", type="primary", width="stretch"):
                 clear_all_records()
                 st.toast("🗑️ Todos los registros han sido borrados. Listo para empezar de 0.")
                 st.rerun()
         with col_conf_no:
-            if st.button("❌ Cancelar", use_container_width=True):
+            if st.button("❌ Cancelar", width="stretch"):
                 st.rerun()
 
     with col_hdr_btn2:
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        if st.button("🗑️ Borrar Todos los Registros", use_container_width=True):
+        if st.button("🗑️ Borrar Todos los Registros", width="stretch"):
             confirm_clear_all_dialog()
 
     # Matchup Selector (Top, Non-typeable Pills)
@@ -1041,7 +1041,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
 
         if st.button(
             f"🎲 Test Mode: Generar Datos Aleatorios (Carrera {selected_race_num})",
-            use_container_width=True,
+            width="stretch",
             key=f"btn_test_mode_{team_a}_{team_b}_{selected_race_num}",
             help="Genera valores aleatorios basados en el Excel de referencia (incluyendo probabilidad de DNF o False Start) y puntuaciones aleatorias de categorías para esta carrera."
         ):
@@ -1167,7 +1167,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         submit_matchup_race = st.button(
             f"🏁 Guardar Resultados de Carrera {selected_race_num}",
             key=f"btn_save_race_{team_a}_{team_b}_{selected_race_num}",
-            use_container_width=True,
+            width="stretch",
             type="primary"
         )
 
@@ -1462,7 +1462,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         edited_data = st.data_editor(
             edit_source,
             num_rows="dynamic",
-            use_container_width=True,
+            width="stretch",
             column_config={
                 "id": st.column_config.NumberColumn("ID #", step=1, disabled=True),
                 "timestamp": st.column_config.TextColumn("Timestamp", disabled=True),
@@ -1479,13 +1479,13 @@ if selected_view == "📝 Pantalla de Edición y Registro":
 
         col_ge_s1, col_ge_s2 = st.columns(2)
         with col_ge_s1:
-            if st.button("💾 Aplicar Cambios de la Grilla y Guardar", use_container_width=True):
+            if st.button("💾 Aplicar Cambios de la Grilla y Guardar", width="stretch"):
                 commit_runs_df(edited_data, recalculate_totals=True)
                 st.toast("✅ Cambios de grilla aplicados con éxito.")
                 st.rerun()
 
         with col_ge_s2:
-            if st.button("⚡ Recalcular Tiempos Totales (Reacción + Carrera)", use_container_width=True):
+            if st.button("⚡ Recalcular Tiempos Totales (Reacción + Carrera)", width="stretch"):
                 commit_runs_df(edited_data, recalculate_totals=True)
                 st.toast("✅ Tiempos totales recalculados.")
                 st.rerun()
@@ -1514,34 +1514,34 @@ elif selected_view == "🏆 Ceremonia de Podio":
     if curr_step == 0:
         _, col_start, _ = st.columns([1, 1.6, 1])
         with col_start:
-            if st.button("🚀 Comenzar Ceremonia de Premiación ➡️", use_container_width=True, type="primary"):
+            if st.button("🚀 Comenzar Ceremonia de Premiación ➡️", width="stretch", type="primary"):
                 st.session_state.podium_slide_step = 1
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
     else:
         col_nav0, col_nav_logo, col_nav3rd, col_nav2nd, col_nav1st = st.columns([0.8, 0.9, 1.0, 1.0, 1.0])
         with col_nav0:
-            if st.button("🔄 Intro", use_container_width=True):
+            if st.button("🔄 Intro", width="stretch"):
                 st.session_state.podium_slide_step = 0
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
         with col_nav_logo:
-            if st.button("🏁 Portada", use_container_width=True, type="secondary"):
+            if st.button("🏁 Portada", width="stretch", type="secondary"):
                 st.session_state.podium_slide_step = 1
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
         with col_nav3rd:
-            if st.button("🥉 3er Lugar", use_container_width=True, type="primary" if curr_step == 1 else "secondary"):
+            if st.button("🥉 3er Lugar", width="stretch", type="primary" if curr_step == 1 else "secondary"):
                 st.session_state.podium_slide_step = 2
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
         with col_nav2nd:
-            if st.button("🥈 2do Lugar", use_container_width=True, type="primary" if curr_step == 2 else "secondary"):
+            if st.button("🥈 2do Lugar", width="stretch", type="primary" if curr_step == 2 else "secondary"):
                 st.session_state.podium_slide_step = 3
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
         with col_nav1st:
-            if st.button("🥇 1er Lugar", use_container_width=True, type="primary" if curr_step == 3 else "secondary"):
+            if st.button("🥇 1er Lugar", width="stretch", type="primary" if curr_step == 3 else "secondary"):
                 st.session_state.podium_slide_step = 4
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
@@ -1622,7 +1622,7 @@ elif selected_view == "📝 Registro de Jurado":
         </div>
         """)
     with col_tnav_prev:
-        if st.button("⬅️ Ant.", use_container_width=True, key="reg_jurado_prev_btn"):
+        if st.button("⬅️ Ant.", width="stretch", key="reg_jurado_prev_btn"):
             st.session_state._pending_jurado_team_idx = (st.session_state.judging_summary_team_idx - 1) % len(official_teams)
             st.rerun()
     with col_tsel:
@@ -1636,7 +1636,7 @@ elif selected_view == "📝 Registro de Jurado":
         )
         st.session_state.judging_summary_team_idx = official_teams.index(selected_team)
     with col_tnav_next:
-        if st.button("Sig. ➡️", use_container_width=True, key="reg_jurado_next_btn"):
+        if st.button("Sig. ➡️", width="stretch", key="reg_jurado_next_btn"):
             st.session_state._pending_jurado_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
             st.rerun()
 
@@ -1787,25 +1787,25 @@ elif selected_view == "📝 Registro de Jurado":
 
         col_b1, col_b2, col_b3, col_b4 = st.columns([1.5, 1.6, 1.2, 1.1])
         with col_b1:
-            if st.button(f"💾 Guardar {selected_team}", type="primary", use_container_width=True, key="rj_save_team_btn"):
+            if st.button(f"💾 Guardar {selected_team}", type="primary", width="stretch", key="rj_save_team_btn"):
                 save_team_scores(selected_team, new_subcat_inputs)
                 st.toast(f"✅ Puntajes de {selected_team} guardados ({live_grand_total:.1f} / 990 pts).")
                 st.rerun()
         with col_b2:
-            if st.button("💾 Guardar y Siguiente ➡️", use_container_width=True, key="rj_save_next_btn"):
+            if st.button("💾 Guardar y Siguiente ➡️", width="stretch", key="rj_save_next_btn"):
                 save_team_scores(selected_team, new_subcat_inputs)
                 st.session_state._pending_jurado_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
                 st.toast(f"✅ {selected_team} guardado. Pasando al siguiente equipo...")
                 st.rerun()
         with col_b3:
-            if st.button("🎲 Datos de Prueba", use_container_width=True, key="rj_rnd_team_btn", help="Genera puntajes de prueba para este equipo."):
+            if st.button("🎲 Datos de Prueba", width="stretch", key="rj_rnd_team_btn", help="Genera puntajes de prueba para este equipo."):
                 rnd_sub = dp.generate_random_subcategories_for_team()
                 save_team_scores(selected_team, rnd_sub)
                 st.session_state._pending_jurado_subcats = (selected_team, rnd_sub)
                 st.toast(f"🎲 Datos de prueba generados para {selected_team}.")
                 st.rerun()
         with col_b4:
-            if st.button("🔄 Reiniciar a 0", use_container_width=True, key="rj_zero_team_btn", help="Pone las subcategorías de este equipo en 0."):
+            if st.button("🔄 Reiniciar a 0", width="stretch", key="rj_zero_team_btn", help="Pone las subcategorías de este equipo en 0."):
                 zero_sub = {k: 0.0 for k in dp.ALL_SUBCATEGORY_KEYS}
                 save_team_scores(selected_team, zero_sub)
                 st.session_state._pending_jurado_subcats = (selected_team, zero_sub)
@@ -1830,7 +1830,7 @@ elif selected_view == "📝 Registro de Jurado":
                 "Carrera (220)": round(float(row.get('Carrera', 0.0)), 1),
                 "TOTAL (990)": round(float(row.get('Total', 0.0)), 1),
             })
-        st.dataframe(pd.DataFrame(matrix_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(matrix_rows), hide_index=True, width="stretch")
 
         col_dl1, col_dl2 = st.columns(2)
         with col_dl1:
@@ -1855,7 +1855,7 @@ elif selected_view == "📝 Registro de Jurado":
                 data=exp_transposed_csv,
                 file_name=f"registro_jurado_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width="stretch",
                 key="rj_dl_csv",
                 help="Descarga el estado actual en formato transpuesta (filas: rubros, columnas: equipos)."
             )
@@ -1869,7 +1869,7 @@ elif selected_view == "📝 Registro de Jurado":
                     data=plantilla_bytes,
                     file_name="plantilla_registro_jurado.csv",
                     mime="text/csv",
-                    use_container_width=True,
+                    width="stretch",
                     key="rj_dl_plantilla_csv",
                     help="Descarga la plantilla con las filas como rubros y las columnas como equipos lista para rellenar."
                 )
