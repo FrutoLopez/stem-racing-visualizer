@@ -1879,11 +1879,11 @@ else:
     # PANTALLA DE TIEMPOS Y RESULTADOS EN PISTA (4 TABS)
     # -------------------------------------------------------------------------
     live_visualizer_sync_watcher()
-    render_html(styles.render_app_header(logo_b64))
+    render_html('<div class="sr-results-screen"></div>' + styles.render_app_header(logo_b64))
 
     tab1, tab2, tab3, tab4 = st.tabs([
         "⏱️ Tiempos por Equipos",
-        "⚔️ Duelos Cara a Cara",
+        "🏁 Carreras",
         "🏎️ Tiempo de Carro",
         "🚀 Tiempo Más Rápido"
     ])
@@ -1893,11 +1893,11 @@ else:
     # ==============================================================================
     with tab1:
         render_html("""
-        <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="font-size: 32px; font-weight: 900; color: #FFFFFF; text-transform: uppercase; margin: 0; letter-spacing: 1px;">
+        <div class="sr-tab-header">
+            <h2>
                 Tiempos por Equipos
             </h2>
-            <div style="color: #A09EB8; font-size: 15px; margin-top: 6px;">
+            <div class="sr-tab-subtitle">
                 Mejor Tiempo Total (Reacción + Carrera) y Tiempo de Carro (Promedio 2do y 3er mejor tiempo) en orden de equipos
             </div>
         </div>
@@ -1955,9 +1955,9 @@ else:
     # ==============================================================================
     with tab2:
         render_html("""
-        <div style="text-align: center; margin-bottom: 20px;">
-            <h2 style="font-size: 32px; font-weight: 900; color: #FFFFFF; text-transform: uppercase; margin: 0;">
-                Duelos Cara a Cara
+        <div class="sr-tab-header">
+            <h2>
+                Carreras
             </h2>
         </div>
         """)
@@ -1966,7 +1966,6 @@ else:
         h2h_matchup_labels = [m['label'] for m in matchups_list]
         if st.session_state.get("slide3_matchup_selector") not in h2h_matchup_labels:
             st.session_state["slide3_matchup_selector"] = h2h_matchup_labels[0]
-        st.markdown("<div style='font-size: 14px; font-weight: 700; color: #E6E4F0; margin-bottom: 6px;'>⚔️ Seleccionar Enfrentamiento:</div>", unsafe_allow_html=True)
         selected_h2h_label = st.pills(
             "Seleccionar Enfrentamiento:",
             options=h2h_matchup_labels,
@@ -1984,17 +1983,17 @@ else:
 
         if is_solo_h2h:
             render_html(f"""
-            <div style="display: flex; justify-content: center; align-items: center; gap: 18px; margin: 12px 0 24px 0;">
-                <span style="font-size: 28px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=44, gap=12)}</span>
-                <span style="font-size: 14px; font-weight: 800; color: #FCBC00; background: rgba(252, 188, 0, 0.14); border: 1px solid rgba(252, 188, 0, 0.45); padding: 6px 14px; border-radius: 20px; letter-spacing: 1px;">🏁 CARRERA INDIVIDUAL</span>
+            <div class="sr-h2h-vs-banner">
+                <span style="font-size: 24px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=36, gap=10)}</span>
+                <span style="font-size: 13px; font-weight: 800; color: #FCBC00; background: rgba(252, 188, 0, 0.14); border: 1px solid rgba(252, 188, 0, 0.45); padding: 5px 12px; border-radius: 20px; letter-spacing: 1px;">🏁 CARRERA INDIVIDUAL</span>
             </div>
             """)
         else:
             render_html(f"""
-            <div style="display: flex; justify-content: center; align-items: center; gap: 22px; margin: 12px 0 24px 0;">
-                <span style="font-size: 28px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=44, gap=12)}</span>
-                <span style="font-size: 22px; font-weight: 900; color: #FF2A85; margin: 0 8px;">VS</span>
-                <span style="font-size: 28px; font-weight: 900; color: #FF8A00;">{team_badge(team_b, height=44, gap=12)}</span>
+            <div class="sr-h2h-vs-banner">
+                <span style="font-size: 24px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=36, gap=10)}</span>
+                <span style="font-size: 20px; font-weight: 900; color: #FF2A85; margin: 0 6px;">VS</span>
+                <span style="font-size: 24px; font-weight: 900; color: #FF8A00;">{team_badge(team_b, height=36, gap=10)}</span>
             </div>
             """)
 
@@ -2122,24 +2121,24 @@ else:
             render_html(h2h_table_html)
 
             h2h_cards_html = f"""
-            <div style="max-width: 540px; margin: 0 auto 24px auto;">
-                <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 12px; padding: 16px 20px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                        <span style="font-size: 18px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=30)}</span>
+            <div style="max-width: 540px; margin: 0 auto 8px auto;">
+                <div class="sr-h2h-card" style="border: 1px solid rgba(0, 240, 255, 0.4);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 16px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=26)}</span>
                         <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos (Individual)</span>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
-                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
-                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
-                            <div style="font-size: 15px; font-weight: 900; color: #FFFFFF; margin-top: 4px;">{rxn_a_txt}</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 7px 6px;">
+                            <div style="font-size: 10px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
+                            <div style="font-size: 14px; font-weight: 900; color: #FFFFFF; margin-top: 2px;">{rxn_a_txt}</div>
                         </div>
-                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
-                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
-                            <div style="font-size: 15px; font-weight: 900; color: #009FE3; margin-top: 4px;">{car_a_txt}</div>
+                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 7px 6px;">
+                            <div style="font-size: 10px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
+                            <div style="font-size: 14px; font-weight: 900; color: #009FE3; margin-top: 2px;">{car_a_txt}</div>
                         </div>
-                        <div style="background: rgba(0, 159, 227, 0.14); border: 1px solid #009FE3; border-radius: 8px; padding: 10px 6px;">
-                            <div style="font-size: 11px; color: #009FE3; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
-                            <div style="font-size: 16px; font-weight: 900; color: #009FE3; margin-top: 4px;">{tot_a_txt}</div>
+                        <div style="background: rgba(0, 159, 227, 0.14); border: 1px solid #009FE3; border-radius: 8px; padding: 7px 6px;">
+                            <div style="font-size: 10px; color: #009FE3; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #009FE3; margin-top: 2px;">{tot_a_txt}</div>
                         </div>
                     </div>
                 </div>
@@ -2226,44 +2225,44 @@ else:
 
             # Highlight summary cards for each team right below the matchup table
             h2h_cards_html = f"""
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-                <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(0, 240, 255, 0.4); border-radius: 12px; padding: 16px 20px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                        <span style="font-size: 18px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=30)}</span>
+            <div class="sr-h2h-cards-grid">
+                <div class="sr-h2h-card" style="border: 1px solid rgba(0, 240, 255, 0.4);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 16px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=26)}</span>
                         <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
-                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
-                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
-                            <div style="font-size: 15px; font-weight: 900; color: #FFFFFF; margin-top: 4px;">{rxn_a_txt}</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 7px 6px;">
+                            <div style="font-size: 10px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
+                            <div style="font-size: 14px; font-weight: 900; color: #FFFFFF; margin-top: 2px;">{rxn_a_txt}</div>
                         </div>
-                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 10px 6px;">
-                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
-                            <div style="font-size: 15px; font-weight: 900; color: #009FE3; margin-top: 4px;">{car_a_txt}</div>
+                        <div style="background: rgba(0, 159, 227, 0.06); border: 1px solid rgba(0, 159, 227, 0.2); border-radius: 8px; padding: 7px 6px;">
+                            <div style="font-size: 10px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
+                            <div style="font-size: 14px; font-weight: 900; color: #009FE3; margin-top: 2px;">{car_a_txt}</div>
                         </div>
-                        <div style="background: rgba(0, 159, 227, 0.14); border: 1px solid #009FE3; border-radius: 8px; padding: 10px 6px;">
-                            <div style="font-size: 11px; color: #009FE3; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
-                            <div style="font-size: 16px; font-weight: 900; color: #009FE3; margin-top: 4px;">{tot_a_txt}</div>
+                        <div style="background: rgba(0, 159, 227, 0.14); border: 1px solid #009FE3; border-radius: 8px; padding: 7px 6px;">
+                            <div style="font-size: 10px; color: #009FE3; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #009FE3; margin-top: 2px;">{tot_a_txt}</div>
                         </div>
                     </div>
                 </div>
-                <div style="background: rgba(18, 12, 36, 0.85); border: 1px solid rgba(237, 109, 5, 0.4); border-radius: 12px; padding: 16px 20px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                        <span style="font-size: 18px; font-weight: 900; color: #ED6D05;">{team_badge(team_b, height=30)}</span>
+                <div class="sr-h2h-card" style="border: 1px solid rgba(237, 109, 5, 0.4);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 16px; font-weight: 900; color: #ED6D05;">{team_badge(team_b, height=26)}</span>
                         <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
-                        <div style="background: rgba(237, 109, 5, 0.06); border: 1px solid rgba(237, 109, 5, 0.2); border-radius: 8px; padding: 10px 6px;">
-                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
-                            <div style="font-size: 15px; font-weight: 900; color: #FFFFFF; margin-top: 4px;">{rxn_b_txt}</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                        <div style="background: rgba(237, 109, 5, 0.06); border: 1px solid rgba(237, 109, 5, 0.2); border-radius: 8px; padding: 7px 6px;">
+                            <div style="font-size: 10px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Mejor Reacción</div>
+                            <div style="font-size: 14px; font-weight: 900; color: #FFFFFF; margin-top: 2px;">{rxn_b_txt}</div>
                         </div>
-                        <div style="background: rgba(237, 109, 5, 0.06); border: 1px solid rgba(237, 109, 5, 0.2); border-radius: 8px; padding: 10px 6px;">
-                            <div style="font-size: 11px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
-                            <div style="font-size: 15px; font-weight: 900; color: #ED6D05; margin-top: 4px;">{car_b_txt}</div>
+                        <div style="background: rgba(237, 109, 5, 0.06); border: 1px solid rgba(237, 109, 5, 0.2); border-radius: 8px; padding: 7px 6px;">
+                            <div style="font-size: 10px; color: #A09EB8; font-weight: 700; text-transform: uppercase;">Tiempo de Carro</div>
+                            <div style="font-size: 14px; font-weight: 900; color: #ED6D05; margin-top: 2px;">{car_b_txt}</div>
                         </div>
-                        <div style="background: rgba(237, 109, 5, 0.14); border: 1px solid #ED6D05; border-radius: 8px; padding: 10px 6px;">
-                            <div style="font-size: 11px; color: #ED6D05; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
-                            <div style="font-size: 16px; font-weight: 900; color: #ED6D05; margin-top: 4px;">{tot_b_txt}</div>
+                        <div style="background: rgba(237, 109, 5, 0.14); border: 1px solid #ED6D05; border-radius: 8px; padding: 7px 6px;">
+                            <div style="font-size: 10px; color: #ED6D05; font-weight: 800; text-transform: uppercase;">Mejor T. Total</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #ED6D05; margin-top: 2px;">{tot_b_txt}</div>
                         </div>
                     </div>
                 </div>
@@ -2278,11 +2277,11 @@ else:
     # ==============================================================================
     with tab3:
         render_html("""
-        <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="font-size: 32px; font-weight: 900; color: #FFFFFF; text-transform: uppercase; margin: 0;">
+        <div class="sr-tab-header">
+            <h2>
                 Tiempo de Carro
             </h2>
-            <div style="color: #A09EB8; font-size: 15px; margin-top: 6px;">
+            <div class="sr-tab-subtitle">
                 Promedio del 2do y 3er mejor tiempo de carrera de cada equipo y diferencia respecto al líder de la categoría
             </div>
         </div>
@@ -2300,22 +2299,22 @@ else:
             # Highlight Banner for Category Leader (Best Car Time of All)
             render_html(f"""
             <div class="sr-leader-banner">
-                <div style="display: flex; align-items: center; gap: 18px;">
-                    <div>{team_logo_only(leader_car_team, height=54, fallback_emoji="🏎️")}</div>
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div>{team_logo_only(leader_car_team, height=44, fallback_emoji="🏎️")}</div>
                     <div>
-                        <div style="font-size: 12px; font-weight: 800; font-style: italic; color: #009FE3; text-transform: uppercase; letter-spacing: 1.5px;">
+                        <div style="font-size: 11px; font-weight: 800; font-style: italic; color: #009FE3; text-transform: uppercase; letter-spacing: 1.5px;">
                             Mejor Tiempo de Carro de Todos (Líder de la Categoría)
                         </div>
-                        <div style="font-size: 30px; font-weight: 900; font-style: italic; color: #FFFFFF; margin-top: 2px;">
+                        <div style="font-size: 24px; font-weight: 900; font-style: italic; color: #FFFFFF; margin-top: 1px;">
                             {leader_car_team}
                         </div>
                     </div>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 12px; font-weight: 700; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">
                         Tiempo Récord de Carro
                     </div>
-                    <div style="font-size: 34px; font-weight: 900; color: #009FE3;">
+                    <div style="font-size: 28px; font-weight: 900; color: #009FE3;">
                         {leader_car_time:.3f} s
                     </div>
                 </div>
@@ -2346,27 +2345,27 @@ else:
                 rank_class = "sr-rank-1" if rank == 1 else ("sr-rank-2" if rank == 2 else ("sr-rank-3" if rank == 3 else "sr-rank-badge"))
 
                 car_broadcast_rows.append(f"""<div class="sr-broadcast-row">
-                    <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
                         <div class="{rank_class}">{rank}</div>
-                        <div>{team_logo_only(team, height=34, fallback_emoji="🏎️")}</div>
+                        <div>{team_logo_only(team, height=28, fallback_emoji="🏎️")}</div>
                         <div>
                             <div class="sr-team-name">{team}</div>
                             {ind_display}
                         </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 28px;">
+                    <div style="display: flex; align-items: center; gap: 14px;">
                         <div style="text-align: right;">
-                            <div style="font-size: 11px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Tiempo de Carro</div>
+                            <div style="font-size: 10px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Tiempo de Carro</div>
                             <div class="sr-time-val">{time_display}</div>
                         </div>
-                        <div style="min-width: 190px; text-align: right;">
-                            <div style="font-size: 11px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Diferencia vs Líder</div>
+                        <div style="min-width: 145px; text-align: right;">
+                            <div style="font-size: 10px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Diferencia vs Líder</div>
                             <div>{delta_display}</div>
                         </div>
                     </div>
                 </div>""")
 
-            render_html("\n".join(car_broadcast_rows))
+            render_html(f'<div class="sr-broadcast-grid">{"".join(car_broadcast_rows)}</div>')
 
         # Tab 3 content complete - no comparison charts as requested
 
@@ -2375,11 +2374,11 @@ else:
     # ==============================================================================
     with tab4:
         render_html("""
-        <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="font-size: 32px; font-weight: 900; color: #FFFFFF; text-transform: uppercase; margin: 0;">
+        <div class="sr-tab-header">
+            <h2>
                 Tiempo Más Rápido
             </h2>
-            <div style="color: #A09EB8; font-size: 15px; margin-top: 6px;">
+            <div class="sr-tab-subtitle">
                 Mejor tiempo total (reacción + carrera) de cada equipo y diferencia respecto al líder de la categoría
             </div>
         </div>
@@ -2397,22 +2396,22 @@ else:
             # Highlight Banner for Category Leader (Fastest Total Time of All)
             render_html(f"""
             <div class="sr-leader-banner" style="border-color: #ED6D05; box-shadow: 0 8px 30px rgba(237, 109, 5, 0.22);">
-                <div style="display: flex; align-items: center; gap: 18px;">
-                    <div>{team_logo_only(leader_tot_team, height=54, fallback_emoji="🚀")}</div>
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div>{team_logo_only(leader_tot_team, height=44, fallback_emoji="🚀")}</div>
                     <div>
-                        <div style="font-size: 12px; font-weight: 800; font-style: italic; color: #ED6D05; text-transform: uppercase; letter-spacing: 1.5px;">
+                        <div style="font-size: 11px; font-weight: 800; font-style: italic; color: #ED6D05; text-transform: uppercase; letter-spacing: 1.5px;">
                             Mejor Tiempo Más Rápido de Todos (Líder de la Categoría)
                         </div>
-                        <div style="font-size: 30px; font-weight: 900; font-style: italic; color: #FFFFFF; margin-top: 2px;">
+                        <div style="font-size: 24px; font-weight: 900; font-style: italic; color: #FFFFFF; margin-top: 1px;">
                             {leader_tot_team}
                         </div>
                     </div>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 12px; font-weight: 700; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">
                         Tiempo Total Récord
                     </div>
-                    <div style="font-size: 34px; font-weight: 900; color: #ED6D05;">
+                    <div style="font-size: 28px; font-weight: 900; color: #ED6D05;">
                         {leader_tot_time:.3f} s
                     </div>
                 </div>
@@ -2450,26 +2449,26 @@ else:
                 rank_class = "sr-rank-1" if rank == 1 else ("sr-rank-2" if rank == 2 else ("sr-rank-3" if rank == 3 else "sr-rank-badge"))
 
                 tot_broadcast_rows.append(f"""<div class="sr-broadcast-row">
-                    <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
                         <div class="{rank_class}">{rank}</div>
-                        <div>{team_logo_only(team, height=34, fallback_emoji="🏎️")}</div>
+                        <div>{team_logo_only(team, height=28, fallback_emoji="🏎️")}</div>
                         <div>
                             <div class="sr-team-name">{team}</div>
                             {detail_html}
                         </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 28px;">
+                    <div style="display: flex; align-items: center; gap: 14px;">
                         <div style="text-align: right;">
-                            <div style="font-size: 11px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Mejor Tiempo Total</div>
+                            <div style="font-size: 10px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Mejor Tiempo Total</div>
                             <div class="sr-time-val">{time_display}</div>
                         </div>
-                        <div style="min-width: 190px; text-align: right;">
-                            <div style="font-size: 11px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Diferencia vs Líder</div>
+                        <div style="min-width: 145px; text-align: right;">
+                            <div style="font-size: 10px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Diferencia vs Líder</div>
                             <div>{delta_display}</div>
                         </div>
                     </div>
                 </div>""")
 
-            render_html("\n".join(tot_broadcast_rows))
+            render_html(f'<div class="sr-broadcast-grid">{"".join(tot_broadcast_rows)}</div>')
 
         # Tab 4 content complete - no comparison charts as requested

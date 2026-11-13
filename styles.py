@@ -556,7 +556,7 @@ input:disabled, .stTextInput input:disabled, div[data-baseweb="input"] input:dis
 div[data-testid="stMainBlockContainer"]:has(.sr-podium-stage),
 section[data-testid="stMain"] div.block-container:has(.sr-podium-stage) {
     max-width: 100% !important;
-    padding-top: 3.0rem !important;
+    padding-top: 2.5rem !important;
     padding-left: 1rem !important;
     padding-right: 1rem !important;
     padding-bottom: 0 !important;
@@ -630,6 +630,143 @@ section[data-testid="stMain"] div.block-container:has(.sr-podium-stage) {
     pointer-events: none;
     filter: drop-shadow(0 2px 10px rgba(0,0,0,0.7));
     animation: srLogoMorphInWhite 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ==========================================================================
+   PRESENTATION VIEWPORT FIT (1536x768) - Scoped only to presentation screens
+   ========================================================================== */
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen),
+section[data-testid="stMain"] div.block-container:has(.sr-results-screen) {
+    max-width: 1460px !important;
+    padding-top: 3.85rem !important;
+    padding-bottom: 0.5rem !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+}
+
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-header-container {
+    padding: 10px 22px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-header-logo img {
+    height: 46px !important;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-header-title {
+    font-size: 24px;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-header-tag {
+    font-size: 13px;
+    padding: 6px 14px;
+}
+
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .stTabs [data-baseweb="tab-list"] {
+    padding: 5px 10px;
+    margin-bottom: 4px;
+    border-radius: 10px;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .stTabs [data-baseweb="tab"] {
+    height: 36px;
+    font-size: 13px;
+    padding: 0 14px;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .stTabs [data-baseweb="tab-panel"] {
+    padding-top: 6px !important;
+}
+
+.sr-tab-header {
+    text-align: center;
+    margin-bottom: 10px;
+}
+.sr-tab-header h2 {
+    font-size: 24px !important;
+    font-weight: 900;
+    color: #FFFFFF;
+    text-transform: uppercase;
+    margin: 0 !important;
+    letter-spacing: 1px;
+    line-height: 1.15;
+}
+.sr-tab-subtitle {
+    color: #A09EB8;
+    font-size: 13px;
+    margin-top: 3px;
+}
+
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-pptx-table {
+    margin: 6px 0;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-pptx-table th {
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-pptx-table td {
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+}
+
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-leader-banner {
+    padding: 10px 20px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+}
+
+.sr-broadcast-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 14px;
+}
+
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-broadcast-row {
+    padding: 7px 14px;
+    margin-bottom: 0;
+    border-radius: 9px;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-rank-badge,
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-rank-1,
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-rank-2,
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-rank-3 {
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-team-name {
+    font-size: 15px;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-time-val {
+    font-size: 17px;
+}
+
+/* Compact H2H matchup banner & summary cards */
+.sr-h2h-vs-banner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 18px;
+    margin: 6px 0 8px 0;
+}
+.sr-h2h-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.sr-h2h-card {
+    background: rgba(18, 12, 36, 0.85);
+    border-radius: 10px;
+    padding: 10px 14px;
+}
+
+/* Podium 1536x768 viewport fit */
+@media (max-height: 820px) {
+    .sr-podium-stage {
+        min-height: 81vh !important;
+        padding: 20px 24px 24px 24px !important;
+    }
+    .sr-podium-stage .sr-podium-container {
+        transform: scale(0.88);
+        transform-origin: bottom center;
+    }
 }
 
 /* ==========================================================================

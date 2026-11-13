@@ -233,3 +233,23 @@ copy a log of this conversation so that i can open it from another computer, add
    - Expanded `.sr-podium-stage` to full-window width (`max-width: 100%`, `min-height: 84vh`, `padding-top: 3.0rem`) with metallic 3D cylindrical pedestals and base64-encoded scalloped laurel-wreath SVG medals (`get_podium_medal_svg`).
    - Added a full-window pre-podium splash screen (`render_podium_logo_splash_slide`) showing the animated flag background with the centered STEM Racing Panamá logo, which shrinks, turns white, and morphs (`.sr-logo-morph-out` / `.sr-logo-morph-in`) into `Podios/SR - Mono White copy.png` in the top-left corner when advancing to 3rd place.
    - Created backup snapshot in `design_backup_v3/`.
+
+---
+
+# Session 3 — 1536×768 Presentation Viewport Fit & Track Results Refinements
+
+- **Conversation ID:** `febf84bd-9535-4264-ba92-e0a28ea5e657`
+- **Date:** `2026-11-12`
+
+## Summary of Changes
+
+1. **1536×768 Presentation Layout (`app.py`, `styles.py`)**
+   - Scoped compact presentation styling to `⏱️ Tiempos y Resultados en Pista` (`.sr-results-screen` marker) and `🏆 Ceremonia de Podio` (`.sr-podium-stage`), leaving data-editing screens (`📝 Pantalla de Edición y Registro` and `📝 Registro de Jurado`) untouched.
+   - Added `padding-top: 3.85rem` on `:has(.sr-results-screen)` so `.sr-header-container` clears Streamlit's fixed top bar without clipping.
+   - Compacted `.sr-header-container`, `stTabs`, `.sr-tab-header`, `.sr-pptx-table`, `.sr-leader-banner`, and H2H summary cards (`.sr-h2h-vs-banner`, `.sr-h2h-cards-grid`, `.sr-h2h-card`).
+   - Switched the team leaderboards in **Tiempo de Carro** and **Tiempo Más Rápido** to a 2-column `.sr-broadcast-grid` so all teams fit within a `1536×768` viewport without vertical scrolling.
+   - Added `@media (max-height: 820px)` rules on `.sr-podium-stage` and `.sr-podium-container` (`transform: scale(0.88)` from `bottom center`) so the podium fits cleanly on `768px` height screens.
+
+2. **Track Results Tab & UI Cleanups (`app.py`)**
+   - Renamed `"⚔️ Duelos Cara a Cara"` to `"🏁 Carreras"` (with checkered flag icon) in both `st.tabs` and the tab heading.
+   - Removed the `"⚔️ Seleccionar Enfrentamiento:"` label above the matchup selector pills in the **🏁 Carreras** tab.
