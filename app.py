@@ -49,6 +49,7 @@ def format_pts(val: float) -> str:
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 PODIOS_DIR = os.path.join(os.path.dirname(__file__), "Podios")
 LOGO_PATH = os.path.join(ASSETS_DIR, "logo.png")
+XL_LOGO_PATH = os.path.join(ASSETS_DIR, "Logo STEM Racing Pa - Neg XL.jpg")
 MONO_WHITE_LOGO_PATH = os.path.join(PODIOS_DIR, "SR - Mono White copy.png")
 TEAMS_CSV_PATH = os.path.join(os.path.dirname(__file__), "Equipos_Nombres.csv")
 LIVE_CSV_PATH = os.path.join(os.path.dirname(__file__), "live_race_data.csv")
@@ -58,7 +59,7 @@ JUDGE_CSV_PATH = os.path.join(os.path.dirname(__file__), "judge_scores.csv")
 def _compute_branding_cache_key() -> tuple:
     """Build a lightweight mtime signature so edits to team CSV, styles, or logos bust @st.cache_data."""
     mtimes = []
-    for p in (TEAMS_CSV_PATH, os.path.join(os.path.dirname(__file__), "styles.py")):
+    for p in (TEAMS_CSV_PATH, XL_LOGO_PATH, os.path.join(os.path.dirname(__file__), "styles.py")):
         mtimes.append(os.path.getmtime(p) if os.path.exists(p) else 0.0)
     for folder in (os.path.join(ASSETS_DIR, "Logos"), PODIOS_DIR):
         if os.path.isdir(folder):
@@ -69,20 +70,45 @@ def _compute_branding_cache_key() -> tuple:
     return tuple(mtimes)
 
 
+def _load_transparent_xl_logo_b64(path: str) -> str:
+    """Load the XL JPEG logo, key out its black background to transparent PNG, crop tight, and return base64."""
+    if not os.path.exists(path):
+        return ""
+    try:
+        import io
+        from PIL import Image
+        img = Image.open(path).convert("RGBA")
+        arr = np.array(img, dtype=np.uint8)
+        max_rgb = arr[:, :, :3].max(axis=2).astype(np.float32)
+        # Smoothly key out near-black background (<=16 -> 0, >=36 -> 255)
+        alpha = np.clip((max_rgb - 16.0) / 20.0, 0.0, 1.0) * 255.0
+        arr[:, :, 3] = alpha.astype(np.uint8)
+        out = Image.fromarray(arr, mode="RGBA")
+        bbox = out.getbbox()
+        if bbox:
+            out = out.crop(bbox)
+        buf = io.BytesIO()
+        out.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        return ""
+
+
 @st.cache_data(show_spinner=False)
 def load_cached_branding_and_teams(cache_key: tuple):
     """Cache CSS, downscaled base64 logos, and team list once per file state to avoid disk I/O spikes."""
     css_str = styles.inject_custom_css()
     main_logo = styles.get_base64_encoded_image(LOGO_PATH, max_size=(640, 260))
+    xl_logo = _load_transparent_xl_logo_b64(XL_LOGO_PATH) or main_logo
     mono_white_logo = styles.get_base64_encoded_image(MONO_WHITE_LOGO_PATH, max_size=(520, 240))
     t_logos = styles.load_team_logos_b64(ASSETS_DIR)
     p_logos = styles.load_podium_logos_b64(PODIOS_DIR)
     teams = dp.load_teams_from_csv(TEAMS_CSV_PATH)
     matchups = dp.get_matchups(teams)
-    return css_str, main_logo, mono_white_logo, t_logos, p_logos, teams, matchups
+    return css_str, main_logo, xl_logo, mono_white_logo, t_logos, p_logos, teams, matchups
 
 
-custom_css_str, logo_b64, mono_white_logo_b64, team_logos_b64, podium_logos_b64, official_teams, matchups_list = load_cached_branding_and_teams(_compute_branding_cache_key())
+custom_css_str, logo_b64, xl_logo_b64, mono_white_logo_b64, team_logos_b64, podium_logos_b64, official_teams, matchups_list = load_cached_branding_and_teams(_compute_branding_cache_key())
 
 # Inject Custom CSS
 if hasattr(st, "html"):
@@ -92,12 +118,17 @@ else:
 
 
 def team_badge(team_name: str, height: int = 28, gap: int = 9) -> str:
-    """Render team logo + team name inline."""
+    """Render rounded podium team logo + team name inline."""
+    if podium_logos_b64 and str(team_name).strip() in podium_logos_b64:
+        icon = styles.get_podium_logo_html(team_name, podium_logos_b64, height=height)
+        return f'<span style="display:inline-flex; align-items:center; gap:{gap}px; vertical-align:middle;">{icon}<span>{team_name}</span></span>'
     return styles.render_team_with_logo(team_name, team_logos_b64, height=height, gap=gap)
 
 
 def team_logo_only(team_name: str, height: int = 34, fallback_emoji: str = "🏎️") -> str:
-    """Render only the team logo (or fallback emoji if team has no logo)."""
+    """Render only the rounded podium team logo (or fallback emoji if team has no logo)."""
+    if podium_logos_b64 and str(team_name).strip() in podium_logos_b64:
+        return styles.get_podium_logo_html(team_name, podium_logos_b64, height=height, fallback_emoji=fallback_emoji)
     return styles.get_team_logo_html(team_name, team_logos_b64, height=height, fallback_emoji=fallback_emoji)
 
 
@@ -422,7 +453,7 @@ with st.sidebar:
         data=csv_bytes_sidebar,
         file_name=f"carreras_stem_racing_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv",
-        use_container_width=True,
+        width='stretch',
         key="sidebar_export_csv_btn",
         help="Descarga una copia del archivo CSV con todos los registros e historial de timestamps."
     )
@@ -436,7 +467,7 @@ with st.sidebar:
     if uploaded_race_csv is not None:
         file_sig = f"{uploaded_race_csv.name}_{uploaded_race_csv.size}"
         auto_loaded = st.session_state.get("_last_uploaded_race_csv_sig") != file_sig
-        reload_clicked = st.button("🔄 Recargar CSV Subido", use_container_width=True, key="reload_uploaded_csv_btn")
+        reload_clicked = st.button("🔄 Recargar CSV Subido", width='stretch', key="reload_uploaded_csv_btn")
         if auto_loaded or reload_clicked:
             uploaded_race_csv.seek(0)
             loaded_csv_df = dp.load_runs_from_csv(uploaded_race_csv)
@@ -461,7 +492,7 @@ with st.sidebar:
     if uploaded_rubric_files:
         rubric_sig = "|".join(f"{f.name}_{f.size}" for f in uploaded_rubric_files)
         auto_load_rubric = st.session_state.get("_last_uploaded_rubric_sig") != rubric_sig
-        reload_rubric_btn = st.button("🔄 Recargar Puntajes de Archivo(s)", use_container_width=True, key="reload_rubric_btn")
+        reload_rubric_btn = st.button("🔄 Recargar Puntajes de Archivo(s)", width='stretch', key="reload_rubric_btn")
         if auto_load_rubric or reload_rubric_btn:
             parsed_scores, parse_msgs = dp.parse_judging_rubric_files(uploaded_rubric_files, official_teams)
             st.session_state["_last_uploaded_rubric_msgs"] = parse_msgs
@@ -482,7 +513,7 @@ with st.sidebar:
         st.session_state["_last_uploaded_rubric_msgs"] = []
 
     with st.expander("✏️ Editar Puntajes de Jueces Manualmente"):
-        if st.button("📝 Abrir Registro de Jurado", use_container_width=True, key="sidebar_goto_js_btn"):
+        if st.button("📝 Abrir Registro de Jurado", width='stretch', key="sidebar_goto_js_btn"):
             st.session_state._pending_view_mode = "📝 Registro de Jurado"
             st.rerun()
         st.caption("Ajusta los puntajes evaluados por los jueces para el Podio General:")
@@ -490,10 +521,10 @@ with st.sidebar:
             edited_rubric = st.data_editor(
                 st.session_state.custom_scores[['team', 'Identidad de Marca', 'Presentación Verbal', 'Especificaciones y Escrutinio', 'Diseño e Ingeniería', 'Gestión de Proyecto']],
                 hide_index=True,
-                use_container_width=True,
+                width='stretch',
                 key="rubric_editor"
             )
-            if st.button("💾 Guardar Puntajes de Jueces", use_container_width=True):
+            if st.button("💾 Guardar Puntajes de Jueces", width='stretch'):
                 for col in dp.NON_RACING_CATEGORIES:
                     st.session_state.custom_scores[col] = pd.to_numeric(edited_rubric[col], errors='coerce').fillna(0.0).clip(
                         lower=0.0, upper=float(dp.CATEGORY_MAX_POINTS.get(col, 200))
@@ -501,7 +532,7 @@ with st.sidebar:
                 save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
                 st.toast("✅ Puntajes de jueces guardados.")
                 st.rerun()
-            if st.button("🔄 Poner Puntajes de Jueces en 0", use_container_width=True):
+            if st.button("🔄 Poner Puntajes de Jueces en 0", width='stretch'):
                 zero_df = dp.get_default_category_scores(official_teams, racing_pts_map, zero_init=True)
                 save_and_sync_judge_scores(zero_df, racing_pts_map)
                 st.toast("🗑️ Puntajes de jueces reiniciados en 0.")
@@ -710,9 +741,9 @@ def render_podium_logo_splash_slide():
         if gif_b64 else ""
     )
     center_logo_html = (
-        f'<img src="data:image/png;base64,{logo_b64}" alt="STEM Racing Panamá" '
-        f'style="max-width: 560px; width: 68%; height: auto; filter: drop-shadow(0 10px 32px rgba(0,0,0,0.85));" />'
-        if logo_b64 else
+        f'<img src="data:image/png;base64,{xl_logo_b64}" alt="STEM Racing Panamá" '
+        f'style="max-width: 720px; width: 74%; height: auto; filter: drop-shadow(0 10px 32px rgba(0,0,0,0.85));" />'
+        if xl_logo_b64 else
         '<div style="font-size: 48px; font-weight: 900; color: #FFFFFF;">STEM RACING PANAMÁ</div>'
     )
     render_html(f"""
@@ -783,9 +814,9 @@ def render_podium_full_slide(reveal_level: int = 3):
         f'style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 0; pointer-events: none;" />'
         if gif_b64 else ""
     )
-    if reveal_level == 1 and logo_b64 and mono_white_logo_b64:
+    if reveal_level == 1 and xl_logo_b64 and mono_white_logo_b64:
         sr_logo_html = (
-            f'<img src="data:image/png;base64,{logo_b64}" alt="" class="sr-logo-morph-out" />'
+            f'<img src="data:image/png;base64,{xl_logo_b64}" alt="" class="sr-logo-morph-out" />'
             f'<img src="data:image/png;base64,{mono_white_logo_b64}" alt="STEM Racing" class="sr-logo-morph-in" />'
         )
     else:
@@ -851,56 +882,109 @@ if selected_view == "📝 Pantalla de Edición y Registro":
     # -------------------------------------------------------------------------
     # PANTALLA DE EDICIÓN Y REGISTRO EN VIVO
     # -------------------------------------------------------------------------
-    col_hdr_title, col_hdr_btn1, col_hdr_btn_js, col_hdr_btn_exp, col_hdr_btn2 = st.columns([2.0, 0.8, 0.9, 0.8, 0.9])
-    with col_hdr_title:
-        render_html("""
-        <div style="margin-bottom: 20px;">
-            <h2 style="font-size: 28px; font-weight: 900; color: #FFFFFF; text-transform: uppercase; margin: 0; letter-spacing: 1px;">
-                📝 Registro y Edición de Carreras en Vivo
-            </h2>
-            <div style="color: #A09EB8; font-size: 14px; margin-top: 5px;">
-                Selecciona el enfrentamiento y la carrera. Registra tiempos, marca DNF o False Start. Los resultados se reflejan automáticamente en el visualizador.
-            </div>
-        </div>
-        """)
-    with col_hdr_btn1:
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        if st.button("📺 Ir al Visualizador", use_container_width=True):
-            st.session_state._pending_view_mode = "⏱️ Tiempos y Resultados en Pista"
-            st.rerun()
-    with col_hdr_btn_js:
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        if st.button("📝 Registro de Jurado", use_container_width=True, key="hdr_goto_js_btn"):
-            st.session_state._pending_view_mode = "📝 Registro de Jurado"
-            st.rerun()
-    with col_hdr_btn_exp:
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        export_df_hdr = st.session_state.history_df if (st.session_state.history_df is not None and not st.session_state.history_df.empty) else pd.DataFrame(columns=dp.CSV_SCHEMA)
-        st.download_button(
-            label="📥 Exportar CSV",
-            data=export_df_hdr.to_csv(index=False).encode("utf-8"),
-            file_name=f"carreras_stem_racing_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-            use_container_width=True,
-            key="hdr_export_csv_btn"
-        )
+    if "editor_mobile_mode" not in st.session_state:
+        st.session_state.editor_mobile_mode = False
+    mobile_mode = bool(st.session_state.editor_mobile_mode)
+
+    if mobile_mode:
+        render_html('<div class="sr-editor-mobile"></div>')
+
     @st.dialog("⚠️ Confirmar Borrado de Registros")
     def confirm_clear_all_dialog():
         st.warning("¿Estás seguro de que deseas borrar **todos los registros** de carreras? Esta acción vaciará los tiempos actuales y el archivo CSV activo para empezar desde 0.")
         col_conf_yes, col_conf_no = st.columns(2)
         with col_conf_yes:
-            if st.button("✅ Sí, borrar todo", type="primary", use_container_width=True):
+            if st.button("✅ Sí, borrar todo", type="primary", width='stretch'):
                 clear_all_records()
                 st.toast("🗑️ Todos los registros han sido borrados. Listo para empezar de 0.")
                 st.rerun()
         with col_conf_no:
-            if st.button("❌ Cancelar", use_container_width=True):
+            if st.button("❌ Cancelar", width='stretch'):
                 st.rerun()
 
-    with col_hdr_btn2:
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-        if st.button("🗑️ Borrar Todos los Registros", use_container_width=True):
-            confirm_clear_all_dialog()
+    export_df_hdr = st.session_state.history_df if (st.session_state.history_df is not None and not st.session_state.history_df.empty) else pd.DataFrame(columns=dp.CSV_SCHEMA)
+    export_csv_bytes = export_df_hdr.to_csv(index=False).encode("utf-8")
+    export_csv_name = f"carreras_stem_racing_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+
+    if mobile_mode:
+        render_html("""
+        <div style="margin-bottom: 10px;">
+            <h2 style="font-size: 20px; font-weight: 900; color: #FFFFFF; text-transform: uppercase; margin: 0; letter-spacing: 0.6px; line-height: 1.2;">
+                📝 Registro de Carreras en Vivo
+            </h2>
+            <div style="color: #A09EB8; font-size: 12px; margin-top: 3px;">
+                Vista móvil optimizada. Los resultados se reflejan automáticamente en el visualizador.
+            </div>
+        </div>
+        """)
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            if st.button("🖥️ Vista Escritorio", type="primary", width='stretch', key="hdr_toggle_desktop_btn"):
+                st.session_state.editor_mobile_mode = False
+                st.rerun()
+        with col_m2:
+            if st.button("📺 Visualizador", width='stretch', key="mob_goto_vis_btn"):
+                st.session_state._pending_view_mode = "⏱️ Tiempos y Resultados en Pista"
+                st.rerun()
+        col_m3, col_m4, col_m5 = st.columns(3)
+        with col_m3:
+            if st.button("📝 Jurado", width='stretch', key="hdr_goto_js_btn"):
+                st.session_state._pending_view_mode = "📝 Registro de Jurado"
+                st.rerun()
+        with col_m4:
+            st.download_button(
+                label="📥 CSV",
+                data=export_csv_bytes,
+                file_name=export_csv_name,
+                mime="text/csv",
+                width='stretch',
+                key="hdr_export_csv_btn"
+            )
+        with col_m5:
+            if st.button("🗑️ Borrar", width='stretch', key="mob_clear_all_btn"):
+                confirm_clear_all_dialog()
+    else:
+        col_hdr_title, col_hdr_btn_mob, col_hdr_btn1, col_hdr_btn_js, col_hdr_btn_exp, col_hdr_btn2 = st.columns([1.85, 0.72, 0.78, 0.85, 0.78, 0.85])
+        with col_hdr_title:
+            render_html("""
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 28px; font-weight: 900; color: #FFFFFF; text-transform: uppercase; margin: 0; letter-spacing: 1px;">
+                    📝 Registro y Edición de Carreras en Vivo
+                </h2>
+                <div style="color: #A09EB8; font-size: 14px; margin-top: 5px;">
+                    Selecciona el enfrentamiento y la carrera. Registra tiempos, marca DNF o False Start. Los resultados se reflejan automáticamente en el visualizador.
+                </div>
+            </div>
+            """)
+        with col_hdr_btn_mob:
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("📱 Móvil", width='stretch', key="hdr_toggle_mobile_btn", help="Cambiar a diseño optimizado para teléfono"):
+                st.session_state.editor_mobile_mode = True
+                st.rerun()
+        with col_hdr_btn1:
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("📺 Ir al Visualizador", width='stretch'):
+                st.session_state._pending_view_mode = "⏱️ Tiempos y Resultados en Pista"
+                st.rerun()
+        with col_hdr_btn_js:
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("📝 Registro de Jurado", width='stretch', key="hdr_goto_js_btn"):
+                st.session_state._pending_view_mode = "📝 Registro de Jurado"
+                st.rerun()
+        with col_hdr_btn_exp:
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            st.download_button(
+                label="📥 Exportar CSV",
+                data=export_csv_bytes,
+                file_name=export_csv_name,
+                mime="text/csv",
+                width='stretch',
+                key="hdr_export_csv_btn"
+            )
+        with col_hdr_btn2:
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("🗑️ Borrar Todos los Registros", width='stretch'):
+                confirm_clear_all_dialog()
 
     # Matchup Selector (Top, Non-typeable Pills)
     matchup_labels = [m['label'] for m in matchups_list]
@@ -1024,7 +1108,11 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         if st.session_state.get(chk_fs_b_key, False):
             st.session_state[chk_dnf_b_key] = False
 
-    col_form_area, col_history_area = st.columns([1.2, 1.1])
+    if mobile_mode:
+        col_form_area = st.container()
+        col_history_area = st.container()
+    else:
+        col_form_area, col_history_area = st.columns([1.2, 1.1])
 
     with col_form_area:
         render_html(f"""
@@ -1041,7 +1129,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
 
         if st.button(
             f"🎲 Test Mode: Generar Datos Aleatorios (Carrera {selected_race_num})",
-            use_container_width=True,
+            width='stretch',
             key=f"btn_test_mode_{team_a}_{team_b}_{selected_race_num}",
             help="Genera valores aleatorios basados en el Excel de referencia (incluyendo probabilidad de DNF o False Start) y puntuaciones aleatorias de categorías para esta carrera."
         ):
@@ -1076,7 +1164,14 @@ if selected_view == "📝 Pantalla de Edición y Registro":
             else:
                 st.toast(f"🎲 Test Mode (Carrera {selected_race_num}): {team_a} [{lbl_a}] | {team_b} [{lbl_b}]. Presiona Guardar para registrar.")
 
-        col_fa_top, col_fb_top = st.columns(2)
+        if mobile_mode:
+            col_fa_top = st.container(border=True)
+            col_fb_top = st.container(border=True)
+            col_fa = col_fa_top
+            col_fb = col_fb_top
+        else:
+            col_fa_top, col_fb_top = st.columns(2)
+
         with col_fa_top:
             status_a_html = '<span style="font-size: 11px; color: #00F0FF; background: rgba(0, 240, 255, 0.12); padding: 2px 8px; border-radius: 6px; font-weight: 700;">✏️ Guardado (sobreescribible)</span>' if already_exists_a else '<span style="font-size: 11px; color: #A09EB8;">⏳ Sin registro</span>'
             st.markdown(f"<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 18px; font-weight: 900; color: #00F0FF;'>{team_badge(team_a, height=28)}</span>{status_a_html}</div>", unsafe_allow_html=True)
@@ -1101,7 +1196,8 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                 st.markdown("<div style='display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;'><span style='font-size: 15px; font-weight: 800; color: #A09EB8;'>🏎️ Modalidad Individual</span><span style='font-size: 11px; color: #FCBC00; background: rgba(252, 188, 0, 0.14); padding: 2px 8px; border-radius: 6px; font-weight: 700;'>Sin Oponente</span></div>", unsafe_allow_html=True)
 
         # Direct session-state bound inputs (no nested st.form split) so toggling DNF/FS or clicking Guardar on mobile/desktop never drops typed numbers
-        col_fa, col_fb = st.columns(2)
+        if not mobile_mode:
+            col_fa, col_fb = st.columns(2)
 
         # -----------------------------
         # TEAM A INPUTS
@@ -1167,7 +1263,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         submit_matchup_race = st.button(
             f"🏁 Guardar Resultados de Carrera {selected_race_num}",
             key=f"btn_save_race_{team_a}_{team_b}_{selected_race_num}",
-            use_container_width=True,
+            width='stretch',
             type="primary"
         )
 
@@ -1462,7 +1558,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
         edited_data = st.data_editor(
             edit_source,
             num_rows="dynamic",
-            use_container_width=True,
+            width='stretch',
             column_config={
                 "id": st.column_config.NumberColumn("ID #", step=1, disabled=True),
                 "timestamp": st.column_config.TextColumn("Timestamp", disabled=True),
@@ -1479,13 +1575,13 @@ if selected_view == "📝 Pantalla de Edición y Registro":
 
         col_ge_s1, col_ge_s2 = st.columns(2)
         with col_ge_s1:
-            if st.button("💾 Aplicar Cambios de la Grilla y Guardar", use_container_width=True):
+            if st.button("💾 Aplicar Cambios de la Grilla y Guardar", width='stretch'):
                 commit_runs_df(edited_data, recalculate_totals=True)
                 st.toast("✅ Cambios de grilla aplicados con éxito.")
                 st.rerun()
 
         with col_ge_s2:
-            if st.button("⚡ Recalcular Tiempos Totales (Reacción + Carrera)", use_container_width=True):
+            if st.button("⚡ Recalcular Tiempos Totales (Reacción + Carrera)", width='stretch'):
                 commit_runs_df(edited_data, recalculate_totals=True)
                 st.toast("✅ Tiempos totales recalculados.")
                 st.rerun()
@@ -1514,34 +1610,34 @@ elif selected_view == "🏆 Ceremonia de Podio":
     if curr_step == 0:
         _, col_start, _ = st.columns([1, 1.6, 1])
         with col_start:
-            if st.button("🚀 Comenzar Ceremonia de Premiación ➡️", use_container_width=True, type="primary"):
+            if st.button("🚀 Comenzar Ceremonia de Premiación ➡️", width='stretch', type="primary"):
                 st.session_state.podium_slide_step = 1
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
     else:
         col_nav0, col_nav_logo, col_nav3rd, col_nav2nd, col_nav1st = st.columns([0.8, 0.9, 1.0, 1.0, 1.0])
         with col_nav0:
-            if st.button("🔄 Intro", use_container_width=True):
+            if st.button("🔄 Intro", width='stretch'):
                 st.session_state.podium_slide_step = 0
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
         with col_nav_logo:
-            if st.button("🏁 Portada", use_container_width=True, type="secondary"):
+            if st.button("🏁 Portada", width='stretch', type="secondary"):
                 st.session_state.podium_slide_step = 1
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
         with col_nav3rd:
-            if st.button("🥉 3er Lugar", use_container_width=True, type="primary" if curr_step == 1 else "secondary"):
+            if st.button("🥉 3er Lugar", width='stretch', type="primary" if curr_step == 1 else "secondary"):
                 st.session_state.podium_slide_step = 2
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
         with col_nav2nd:
-            if st.button("🥈 2do Lugar", use_container_width=True, type="primary" if curr_step == 2 else "secondary"):
+            if st.button("🥈 2do Lugar", width='stretch', type="primary" if curr_step == 2 else "secondary"):
                 st.session_state.podium_slide_step = 3
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
         with col_nav1st:
-            if st.button("🥇 1er Lugar", use_container_width=True, type="primary" if curr_step == 3 else "secondary"):
+            if st.button("🥇 1er Lugar", width='stretch', type="primary" if curr_step == 3 else "secondary"):
                 st.session_state.podium_slide_step = 4
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
@@ -1622,7 +1718,7 @@ elif selected_view == "📝 Registro de Jurado":
         </div>
         """)
     with col_tnav_prev:
-        if st.button("⬅️ Ant.", use_container_width=True, key="reg_jurado_prev_btn"):
+        if st.button("⬅️ Ant.", width='stretch', key="reg_jurado_prev_btn"):
             st.session_state._pending_jurado_team_idx = (st.session_state.judging_summary_team_idx - 1) % len(official_teams)
             st.rerun()
     with col_tsel:
@@ -1636,7 +1732,7 @@ elif selected_view == "📝 Registro de Jurado":
         )
         st.session_state.judging_summary_team_idx = official_teams.index(selected_team)
     with col_tnav_next:
-        if st.button("Sig. ➡️", use_container_width=True, key="reg_jurado_next_btn"):
+        if st.button("Sig. ➡️", width='stretch', key="reg_jurado_next_btn"):
             st.session_state._pending_jurado_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
             st.rerun()
 
@@ -1787,25 +1883,25 @@ elif selected_view == "📝 Registro de Jurado":
 
         col_b1, col_b2, col_b3, col_b4 = st.columns([1.5, 1.6, 1.2, 1.1])
         with col_b1:
-            if st.button(f"💾 Guardar {selected_team}", type="primary", use_container_width=True, key="rj_save_team_btn"):
+            if st.button(f"💾 Guardar {selected_team}", type="primary", width='stretch', key="rj_save_team_btn"):
                 save_team_scores(selected_team, new_subcat_inputs)
                 st.toast(f"✅ Puntajes de {selected_team} guardados ({live_grand_total:.1f} / 990 pts).")
                 st.rerun()
         with col_b2:
-            if st.button("💾 Guardar y Siguiente ➡️", use_container_width=True, key="rj_save_next_btn"):
+            if st.button("💾 Guardar y Siguiente ➡️", width='stretch', key="rj_save_next_btn"):
                 save_team_scores(selected_team, new_subcat_inputs)
                 st.session_state._pending_jurado_team_idx = (st.session_state.judging_summary_team_idx + 1) % len(official_teams)
                 st.toast(f"✅ {selected_team} guardado. Pasando al siguiente equipo...")
                 st.rerun()
         with col_b3:
-            if st.button("🎲 Datos de Prueba", use_container_width=True, key="rj_rnd_team_btn", help="Genera puntajes de prueba para este equipo."):
+            if st.button("🎲 Datos de Prueba", width='stretch', key="rj_rnd_team_btn", help="Genera puntajes de prueba para este equipo."):
                 rnd_sub = dp.generate_random_subcategories_for_team()
                 save_team_scores(selected_team, rnd_sub)
                 st.session_state._pending_jurado_subcats = (selected_team, rnd_sub)
                 st.toast(f"🎲 Datos de prueba generados para {selected_team}.")
                 st.rerun()
         with col_b4:
-            if st.button("🔄 Reiniciar a 0", use_container_width=True, key="rj_zero_team_btn", help="Pone las subcategorías de este equipo en 0."):
+            if st.button("🔄 Reiniciar a 0", width='stretch', key="rj_zero_team_btn", help="Pone las subcategorías de este equipo en 0."):
                 zero_sub = {k: 0.0 for k in dp.ALL_SUBCATEGORY_KEYS}
                 save_team_scores(selected_team, zero_sub)
                 st.session_state._pending_jurado_subcats = (selected_team, zero_sub)
@@ -1830,7 +1926,7 @@ elif selected_view == "📝 Registro de Jurado":
                 "Carrera (220)": round(float(row.get('Carrera', 0.0)), 1),
                 "TOTAL (990)": round(float(row.get('Total', 0.0)), 1),
             })
-        st.dataframe(pd.DataFrame(matrix_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(matrix_rows), hide_index=True, width='stretch')
 
         col_dl1, col_dl2 = st.columns(2)
         with col_dl1:
@@ -1855,7 +1951,7 @@ elif selected_view == "📝 Registro de Jurado":
                 data=exp_transposed_csv,
                 file_name=f"registro_jurado_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width='stretch',
                 key="rj_dl_csv",
                 help="Descarga el estado actual en formato transpuesta (filas: rubros, columnas: equipos)."
             )
@@ -1869,7 +1965,7 @@ elif selected_view == "📝 Registro de Jurado":
                     data=plantilla_bytes,
                     file_name="plantilla_registro_jurado.csv",
                     mime="text/csv",
-                    use_container_width=True,
+                    width='stretch',
                     key="rj_dl_plantilla_csv",
                     help="Descarga la plantilla con las filas como rubros y las columnas como equipos lista para rellenar."
                 )
@@ -1925,10 +2021,10 @@ else:
                 car_str = f"{car_val:.3f} s" if (pd.notna(car_val) and car_val > 0) else '<span class="sr-pending-badge">⏳ Pendiente</span>'
 
                 rows.append(f"""<tr>
-                    <td style="text-align: center; font-weight: 800; color: #A09EB8;">#{ord_num}</td>
-                    <td style="font-weight: 800; color: #FFFFFF; font-size: 16px;">{team_badge(r['team'], height=30)}</td>
-                    <td style="text-align: right; color: #009FE3; font-weight: 900; font-size: 16px;">{tot_str}</td>
-                    <td style="text-align: right; color: #ED6D05; font-weight: 900; font-size: 16px;">{car_str}</td>
+                    <td style="text-align: center; font-weight: 800; color: #A09EB8; font-size: 16px;">#{ord_num}</td>
+                    <td style="font-weight: 800; color: #FFFFFF; font-size: 18px;">{team_badge(r['team'], height=32)}</td>
+                    <td style="text-align: right; color: #009FE3; font-weight: 900; font-size: 18px;">{tot_str}</td>
+                    <td style="text-align: right; color: #ED6D05; font-weight: 900; font-size: 18px;">{car_str}</td>
                 </tr>""")
             return f"""<table class="sr-pptx-table">
                 <thead>
@@ -1969,7 +2065,6 @@ else:
         selected_h2h_label = st.pills(
             "Seleccionar Enfrentamiento:",
             options=h2h_matchup_labels,
-            default=h2h_matchup_labels[0],
             key="slide3_matchup_selector",
             label_visibility="collapsed"
         )
@@ -2300,21 +2395,21 @@ else:
             render_html(f"""
             <div class="sr-leader-banner">
                 <div style="display: flex; align-items: center; gap: 14px;">
-                    <div>{team_logo_only(leader_car_team, height=44, fallback_emoji="🏎️")}</div>
+                    <div>{team_logo_only(leader_car_team, height=48, fallback_emoji="🏎️")}</div>
                     <div>
-                        <div style="font-size: 11px; font-weight: 800; font-style: italic; color: #009FE3; text-transform: uppercase; letter-spacing: 1.5px;">
+                        <div style="font-size: 13px; font-weight: 800; font-style: italic; color: #009FE3; text-transform: uppercase; letter-spacing: 1.5px;">
                             Mejor Tiempo de Carro de Todos (Líder de la Categoría)
                         </div>
-                        <div style="font-size: 24px; font-weight: 900; font-style: italic; color: #FFFFFF; margin-top: 1px;">
+                        <div style="font-size: 28px; font-weight: 900; font-style: italic; color: #FFFFFF; margin-top: 1px;">
                             {leader_car_team}
                         </div>
                     </div>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 11px; font-weight: 700; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">
+                    <div style="font-size: 13px; font-weight: 700; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">
                         Tiempo Récord de Carro
                     </div>
-                    <div style="font-size: 28px; font-weight: 900; color: #009FE3;">
+                    <div style="font-size: 32px; font-weight: 900; color: #009FE3;">
                         {leader_car_time:.3f} s
                     </div>
                 </div>
@@ -2355,12 +2450,12 @@ else:
                     </div>
                     <div style="display: flex; align-items: center; gap: 14px;">
                         <div style="text-align: right;">
-                            <div style="font-size: 10px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Tiempo de Carro</div>
+                            <div style="font-size: 11px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Tiempo de Carro</div>
                             <div class="sr-time-val">{time_display}</div>
                         </div>
                         <div style="min-width: 145px; text-align: right;">
-                            <div style="font-size: 10px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Diferencia vs Líder</div>
-                            <div>{delta_display}</div>
+                            <div style="font-size: 11px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Diferencia vs Líder</div>
+                            <div style="font-size: 18px;">{delta_display}</div>
                         </div>
                     </div>
                 </div>""")
@@ -2397,21 +2492,21 @@ else:
             render_html(f"""
             <div class="sr-leader-banner" style="border-color: #ED6D05; box-shadow: 0 8px 30px rgba(237, 109, 5, 0.22);">
                 <div style="display: flex; align-items: center; gap: 14px;">
-                    <div>{team_logo_only(leader_tot_team, height=44, fallback_emoji="🚀")}</div>
+                    <div>{team_logo_only(leader_tot_team, height=48, fallback_emoji="🚀")}</div>
                     <div>
-                        <div style="font-size: 11px; font-weight: 800; font-style: italic; color: #ED6D05; text-transform: uppercase; letter-spacing: 1.5px;">
+                        <div style="font-size: 13px; font-weight: 800; font-style: italic; color: #ED6D05; text-transform: uppercase; letter-spacing: 1.5px;">
                             Mejor Tiempo Más Rápido de Todos (Líder de la Categoría)
                         </div>
-                        <div style="font-size: 24px; font-weight: 900; font-style: italic; color: #FFFFFF; margin-top: 1px;">
+                        <div style="font-size: 28px; font-weight: 900; font-style: italic; color: #FFFFFF; margin-top: 1px;">
                             {leader_tot_team}
                         </div>
                     </div>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 11px; font-weight: 700; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">
+                    <div style="font-size: 13px; font-weight: 700; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">
                         Tiempo Total Récord
                     </div>
-                    <div style="font-size: 28px; font-weight: 900; color: #ED6D05;">
+                    <div style="font-size: 32px; font-weight: 900; color: #ED6D05;">
                         {leader_tot_time:.3f} s
                     </div>
                 </div>
@@ -2459,12 +2554,12 @@ else:
                     </div>
                     <div style="display: flex; align-items: center; gap: 14px;">
                         <div style="text-align: right;">
-                            <div style="font-size: 10px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Mejor Tiempo Total</div>
+                            <div style="font-size: 11px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Mejor Tiempo Total</div>
                             <div class="sr-time-val">{time_display}</div>
                         </div>
                         <div style="min-width: 145px; text-align: right;">
-                            <div style="font-size: 10px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Diferencia vs Líder</div>
-                            <div>{delta_display}</div>
+                            <div style="font-size: 11px; color: #A09EB8; text-transform: uppercase; font-weight: 700;">Diferencia vs Líder</div>
+                            <div style="font-size: 18px;">{delta_display}</div>
                         </div>
                     </div>
                 </div>""")

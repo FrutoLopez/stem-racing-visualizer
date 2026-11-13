@@ -253,3 +253,28 @@ copy a log of this conversation so that i can open it from another computer, add
 2. **Track Results Tab & UI Cleanups (`app.py`)**
    - Renamed `"⚔️ Duelos Cara a Cara"` to `"🏁 Carreras"` (with checkered flag icon) in both `st.tabs` and the tab heading.
    - Removed the `"⚔️ Seleccionar Enfrentamiento:"` label above the matchup selector pills in the **🏁 Carreras** tab.
+
+---
+
+# Session 4 — Streamlit Deprecations, XL Podium Logo, Mobile Editor & Rounded Team Badges
+
+- **Conversation ID:** `febf84bd-9535-4264-ba92-e0a28ea5e657`
+- **Date:** `2026-11-13`
+
+## Summary of Changes
+
+1. **Streamlit Warnings & API Updates (`app.py`)**
+   - Removed the redundant `default=` parameter on `st.pills` for `slide3_matchup_selector` since its value is managed via `st.session_state`.
+   - Replaced all 33 `use_container_width=True` calls with `width='stretch'`.
+
+2. **XL Podium Logo (`app.py`, `assets/Logo STEM Racing Pa - Neg XL.jpg`)**
+   - Added `_load_transparent_xl_logo_b64()` (cached in `load_cached_branding_and_teams`) to key out the black background of `assets/Logo STEM Racing Pa - Neg XL.jpg`, crop tightly to the logo bounds (`953 × 389` px), and render it as a transparent PNG in both `render_podium_logo_splash_slide()` and the morph-out transition in `render_podium_full_slide()`.
+
+3. **Mobile-Friendly Layout for Editor (`app.py`, `styles.py`)**
+   - Added a **📱 Móvil** / **🖥️ Vista Escritorio** toggle (`editor_mobile_mode`) in `📝 Pantalla de Edición y Registro`.
+   - In mobile mode, switches to a `560px` max-width single-column layout (`.sr-editor-mobile`), reorganizes header actions into 2- and 3-column rows, stacks Team A and Team B into separate bordered cards, stacks the form above the history table, and enlarges touch targets (`44px` buttons, `16px` input text).
+
+4. **Rounded Team Logos with White Circular Backing & Larger Presentation Fonts (`app.py`, `styles.py`)**
+   - Updated `team_badge()` and `team_logo_only()` to use the rounded transparent PNG logos from `Podios/` (`podium_logos_b64`) across the entire app, removing the temporary duplicate screen.
+   - Wrapped `styles.get_podium_logo_html()` in a slightly larger white circular container (`#FFFFFF`, `border-radius: 50%`, `padding = max(2, round(height * 0.07))`) for crisp contrast on dark backgrounds without editing the PNG files.
+   - Increased font sizes across `⏱️ Tiempos y Resultados en Pista` (header, tabs, tables, leader banners, broadcast rows) and `🏆 Ceremonia de Podio` (team names `26px`, pedestal points `23px`).

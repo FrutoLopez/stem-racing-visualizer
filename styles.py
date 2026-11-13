@@ -653,11 +653,11 @@ div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-header-logo 
     height: 46px !important;
 }
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-header-title {
-    font-size: 24px;
+    font-size: 28px;
 }
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-header-tag {
-    font-size: 13px;
-    padding: 6px 14px;
+    font-size: 15px;
+    padding: 6px 15px;
 }
 
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .stTabs [data-baseweb="tab-list"] {
@@ -666,9 +666,9 @@ div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .stTabs [data-ba
     border-radius: 10px;
 }
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .stTabs [data-baseweb="tab"] {
-    height: 36px;
-    font-size: 13px;
-    padding: 0 14px;
+    height: 40px;
+    font-size: 15px;
+    padding: 0 16px;
 }
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .stTabs [data-baseweb="tab-panel"] {
     padding-top: 6px !important;
@@ -679,7 +679,7 @@ div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .stTabs [data-ba
     margin-bottom: 10px;
 }
 .sr-tab-header h2 {
-    font-size: 24px !important;
+    font-size: 28px !important;
     font-weight: 900;
     color: #FFFFFF;
     text-transform: uppercase;
@@ -689,7 +689,7 @@ div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .stTabs [data-ba
 }
 .sr-tab-subtitle {
     color: #A09EB8;
-    font-size: 13px;
+    font-size: 15px;
     margin-top: 3px;
 }
 
@@ -698,11 +698,11 @@ div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-pptx-table {
 }
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-pptx-table th {
     padding: 9px 12px !important;
-    font-size: 13px !important;
+    font-size: 15px !important;
 }
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-pptx-table td {
     padding: 8px 12px !important;
-    font-size: 14px !important;
+    font-size: 16px !important;
 }
 
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-leader-banner {
@@ -726,15 +726,15 @@ div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-rank-badge,
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-rank-1,
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-rank-2,
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-rank-3 {
-    width: 32px;
-    height: 32px;
-    font-size: 15px;
+    width: 36px;
+    height: 36px;
+    font-size: 17px;
 }
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-team-name {
-    font-size: 15px;
+    font-size: 18px;
 }
 div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-time-val {
-    font-size: 17px;
+    font-size: 20px;
 }
 
 /* Compact H2H matchup banner & summary cards */
@@ -767,6 +767,29 @@ div[data-testid="stMainBlockContainer"]:has(.sr-results-screen) .sr-time-val {
         transform: scale(0.88);
         transform-origin: bottom center;
     }
+}
+
+/* Mobile-friendly Editor Layout (toggled via Vista Móvil button) */
+div[data-testid="stMainBlockContainer"]:has(.sr-editor-mobile),
+section[data-testid="stMain"] div.block-container:has(.sr-editor-mobile) {
+    max-width: 560px !important;
+    padding-top: 3.5rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    padding-bottom: 1.5rem !important;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-editor-mobile) button[kind] {
+    min-height: 44px !important;
+    font-size: 14px !important;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-editor-mobile) .stNumberInput input,
+div[data-testid="stMainBlockContainer"]:has(.sr-editor-mobile) .stTextInput input {
+    font-size: 16px !important;
+    min-height: 42px !important;
+}
+div[data-testid="stMainBlockContainer"]:has(.sr-editor-mobile) .stCheckbox label {
+    padding: 4px 0 !important;
+    font-size: 15px !important;
 }
 
 /* ==========================================================================
@@ -1158,14 +1181,19 @@ def load_podium_logos_b64(podios_dir: str) -> dict:
 
 
 def get_podium_logo_html(team_name: str, podium_logos_b64: dict, height: int = 72, fallback_emoji: str = "🏎️") -> str:
-    """Return a borderless transparent PNG logo for the podium ceremony."""
+    """Return a rounded transparent PNG logo inside a slightly larger circular white backing for dark-background contrast."""
     b64 = podium_logos_b64.get(str(team_name).strip(), "") if podium_logos_b64 else ""
     if b64:
+        pad = max(2, int(round(height * 0.07)))
+        circle_sz = height + pad * 2
         return (
+            f'<span style="width:{circle_sz}px; height:{circle_sz}px; border-radius:50%; '
+            f'background:#FFFFFF; display:inline-flex; align-items:center; justify-content:center; '
+            f'padding:{pad}px; box-sizing:border-box; vertical-align:middle; flex-shrink:0; '
+            f'box-shadow:0 3px 12px rgba(0,0,0,0.5);">'
             f'<img src="data:image/png;base64,{b64}" alt="{team_name}" '
-            f'style="height:{height}px; width:auto; max-width:100%; object-fit:contain; '
-            f'display:inline-block; vertical-align:middle; '
-            f'filter:drop-shadow(0 4px 12px rgba(0,0,0,0.65));" />'
+            f'style="width:100%; height:100%; object-fit:contain; display:block; border-radius:50%;" />'
+            f'</span>'
         )
     return f'<span style="font-size:{int(height*0.6)}px; line-height:1;">{fallback_emoji}</span>'
 
