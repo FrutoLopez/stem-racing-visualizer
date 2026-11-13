@@ -548,9 +548,88 @@ input:disabled, .stTextInput input:disabled, div[data-baseweb="input"] input:dis
     opacity: 0;
     animation: srRisePedestal 0.9s cubic-bezier(0.22, 1, 0.36, 1) 1.80s forwards;
 }
+.sr-podium-anim-pop {
+    opacity: 0;
+    animation: srRisePedestal 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.08s forwards;
+}
+/* Full-window Podium Stage override */
+div[data-testid="stMainBlockContainer"]:has(.sr-podium-stage),
+section[data-testid="stMain"] div.block-container:has(.sr-podium-stage) {
+    max-width: 100% !important;
+    padding-top: 3.0rem !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    padding-bottom: 0 !important;
+}
+
 .sr-podium-anim-table {
     opacity: 0;
     animation: srFadeSlideUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) 2.65s forwards;
+}
+.sr-podium-anim-table-fast {
+    opacity: 0;
+    animation: srFadeSlideUp 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.75s forwards;
+}
+
+/* Morph transition from centered color logo (Portada) to top-left white logo (3er Lugar) */
+@keyframes srLogoMorphOutColor {
+    0% {
+        top: 50%;
+        left: 50%;
+        height: 230px;
+        transform: translate(-50%, -50%) scale(1);
+        filter: drop-shadow(0 10px 32px rgba(0,0,0,0.85)) brightness(1) saturate(1);
+        opacity: 1;
+    }
+    45% {
+        filter: drop-shadow(0 6px 18px rgba(0,0,0,0.75)) brightness(0) invert(1);
+        opacity: 0.9;
+    }
+    100% {
+        top: 24px;
+        left: 28px;
+        height: 82px;
+        transform: translate(0, 0) scale(1);
+        filter: drop-shadow(0 2px 10px rgba(0,0,0,0.7)) brightness(0) invert(1);
+        opacity: 0;
+    }
+}
+
+@keyframes srLogoMorphInWhite {
+    0% {
+        top: 50%;
+        left: 50%;
+        height: 230px;
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0;
+    }
+    35% {
+        opacity: 0.25;
+    }
+    100% {
+        top: 24px;
+        left: 28px;
+        height: 82px;
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+    }
+}
+
+.sr-logo-morph-out {
+    position: absolute;
+    width: auto;
+    z-index: 2;
+    pointer-events: none;
+    animation: srLogoMorphOutColor 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.sr-logo-morph-in {
+    position: absolute;
+    width: auto;
+    z-index: 2;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 10px rgba(0,0,0,0.7));
+    animation: srLogoMorphInWhite 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* ==========================================================================
@@ -704,94 +783,124 @@ input:disabled, .stTextInput input:disabled, div[data-baseweb="input"] input:dis
    REGISTRO DE JURADO - COMPACT DARK MOTORSPORT SCORECARD STYLES
    ========================================================================== */
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) {
-    gap: 0px !important;
-    background: rgba(18, 14, 28, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 8px;
-    padding: 4px 10px 6px 10px;
-    box-shadow: 0 8px 24px rgba(5, 0, 11, 0.65);
+    gap: 1px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0px !important;
+    padding: 0px 4px !important;
+    box-shadow: none !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stHorizontalBlock"] {
-    gap: 4px !important;
+    gap: 6px !important;
     align-items: center !important;
     margin-bottom: 0px !important;
     margin-top: 0px !important;
 }
-div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] {
-    margin-bottom: 0 !important;
-    margin-top: 0 !important;
-}
-div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"],
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInputContainer"] {
+    margin: 0 !important;
+    padding: 0 !important;
     min-height: 22px !important;
     height: 22px !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] div[data-baseweb="input"],
+div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] div[data-baseweb="base-input"] {
+    min-height: 22px !important;
+    height: 22px !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-radius: 3px !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] input {
     padding: 0 2px !important;
+    margin: 0 !important;
     font-size: 12px !important;
     font-weight: 800 !important;
-    height: 20px !important;
-    min-height: 20px !important;
+    height: 22px !important;
+    min-height: 22px !important;
+    line-height: 22px !important;
+    border: none !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] button {
-    height: 20px !important;
-    min-height: 20px !important;
-    padding: 0 4px !important;
-}
-.sr-jurado-cat-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: rgba(30, 24, 46, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-left: 3px solid #E6007E;
-    border-radius: 4px;
-    padding: 3px 8px;
-    margin-top: 5px;
-    margin-bottom: 2px;
+    height: 22px !important;
+    min-height: 22px !important;
+    width: 22px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 .sr-jurado-divider {
     height: 1px;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.0) 0%, rgba(255, 255, 255, 0.18) 15%, rgba(255, 255, 255, 0.18) 85%, rgba(255, 255, 255, 0.0) 100%);
-    margin: 4px 0 2px 0;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 3px 0 2px 0;
+}
+.sr-jurado-cat-head {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: none;
+    height: 24px;
+    padding: 0 4px;
+    margin-top: 2px;
+    margin-bottom: 1px;
 }
 .sr-jurado-cat-name {
-    font-size: 11.5px;
-    font-weight: 800;
+    font-size: 12px;
+    font-weight: 900;
     font-style: italic;
     color: #FFFFFF;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+.sr-jurado-cat-pts {
+    background: transparent;
+    color: #FFFFFF;
+    font-weight: 900;
+    font-size: 11.5px;
+    padding: 0 4px;
+    border: none;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 .sr-jurado-cat-badge {
-    font-size: 11px;
-    font-weight: 800;
+    font-size: 12px;
+    font-weight: 900;
     color: #FCBC00;
-    background: rgba(252, 188, 0, 0.12);
-    border: 1px solid rgba(252, 188, 0, 0.3);
-    border-radius: 3px;
-    padding: 0px 6px;
+    background: transparent;
+    border: none;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 4px;
 }
 .sr-jurado-sub-label {
-    background: rgba(255, 255, 255, 0.03);
-    color: #F0F0F5;
+    background: transparent;
+    color: #E8E8F0;
     font-weight: 500;
     font-size: 11.5px;
-    padding: 0 8px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 3px;
+    padding: 0 4px;
+    border: none;
     height: 22px;
     display: flex;
     align-items: center;
 }
 .sr-jurado-sub-pts {
-    background: rgba(255, 255, 255, 0.05);
-    color: #A0A0B5;
+    background: transparent;
+    color: #9A9AB0;
     font-weight: 700;
     font-size: 11px;
     padding: 0 4px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 3px;
+    border: none;
     height: 22px;
     display: flex;
     align-items: center;
@@ -799,13 +908,12 @@ div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data
     text-align: center;
 }
 .sr-jurado-sub-val {
-    background: rgba(0, 159, 227, 0.10);
+    background: transparent;
     color: #009FE3;
     font-weight: 800;
     font-size: 11.5px;
     padding: 0 4px;
-    border: 1px solid rgba(0, 159, 227, 0.3);
-    border-radius: 3px;
+    border: none;
     height: 22px;
     display: flex;
     align-items: center;
@@ -814,25 +922,23 @@ div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data
 }
 .sr-jurado-racing-head {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    background: rgba(0, 159, 227, 0.12);
-    border: 1px solid rgba(0, 159, 227, 0.35);
-    border-left: 3px solid #009FE3;
-    border-radius: 4px;
-    padding: 2px 8px;
+    background: transparent;
+    border: none;
+    height: 24px;
+    padding: 0 4px;
     margin-top: 2px;
-    margin-bottom: 0px;
+    margin-bottom: 1px;
 }
 .sr-jurado-total-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: linear-gradient(135deg, rgba(230, 0, 126, 0.22) 0%, rgba(252, 188, 0, 0.16) 100%);
-    border: 1.5px solid rgba(252, 188, 0, 0.55);
-    border-radius: 5px;
-    padding: 3px 10px;
-    margin-top: 3px;
+    background: transparent;
+    border: none;
+    border-top: 1px solid rgba(252, 188, 0, 0.35);
+    padding: 6px 4px 2px 4px;
+    margin-top: 4px;
 }
 div[data-testid="stNumberInput"] input {
     text-align: center !important;
@@ -859,27 +965,128 @@ def render_app_header(logo_b64: str = "") -> str:
 
 
 TEAM_LOGO_FILES = {
-    "BoscoTech": "logo_boscotech.png",
-    "JAF Racing Team": "logo_jaf_racing_team.png",
-    "Excalibur": "logo_excalibur.png",
-    "Rayo Rabin": "logo_rayo_rabin.png",
-    "Hayai Aerodynamics": "logo_hayai_aerodynamics.png",
-    "Dim3nsion": "logo_dim3nsion.png",
-    "Raiders": "logo_raiders.png",
-    "Cybercolts Racing": "logo_cybercolts_racing.png",
-    "PNTHR": "logo_pnthr.png",
+    "BoscoTech": "Logos/01 BoscoTech.jpeg",
+    "JAF Racing Team": "Logos/02 JAF Racing Team.jpeg",
+    "Excalibur": "Logos/03 Excalibur.jpeg",
+    "Rayo Rabin": "Logos/04 Rayo Rabin.jpeg",
+    "Hayai Aerodynamics": "Logos/05 Hayai Aerodynamics.jpeg",
+    "Dim3nsion Motosport": "Logos/06 Dim3nsion.jpeg",
+    "Dim3nsion": "Logos/06 Dim3nsion.jpeg",
+    "Brader Raiders Racing Team": "Logos/07 Brader Raiders Racing Team.jpeg",
+    "Raiders": "Logos/07 Brader Raiders Racing Team.jpeg",
+    "Cybercolts Racing": "Logos/08 Cybercolts Racing.jpeg",
+    "PNTHR Racing": "Logos/09 PNTHR Racing.jpeg",
+    "PNTHR": "Logos/09 PNTHR Racing.jpeg",
 }
 
 
 def load_team_logos_b64(assets_dir: str) -> dict:
-    """Load base64-encoded PNG logos (downscaled to 132x90 max) for all teams in assets."""
+    """Load base64-encoded logos (downscaled to 132x90 max) for all teams from assets/Logos/."""
     logos = {}
-    for team_name, filename in TEAM_LOGO_FILES.items():
-        path = os.path.join(assets_dir, filename)
-        b64 = get_base64_encoded_image(path, max_size=(132, 90))
+    for team_name, rel_path in TEAM_LOGO_FILES.items():
+        chosen_path = os.path.join(assets_dir, rel_path)
+        b64 = get_base64_encoded_image(chosen_path, max_size=(132, 90))
         if b64:
             logos[team_name] = b64
     return logos
+
+
+PODIUM_LOGO_FILES = {
+    "BoscoTech": "01 BoscoTech.png",
+    "JAF Racing Team": "02 JAF Racing Team.png",
+    "Excalibur": "03 Excalibur.png",
+    "Rayo Rabin": "04 Rayo Rabin.png",
+    "Hayai Aerodynamics": "05 Hayai Aerodynamics.png",
+    "Dim3nsion Motosport": "06 Dim3nsion.png",
+    "Dim3nsion": "06 Dim3nsion.png",
+    "Brader Raiders Racing Team": "07 Brader Raiders Racing Team.png",
+    "Raiders": "07 Brader Raiders Racing Team.png",
+    "Cybercolts Racing": "08 Cybercolts Racing.png",
+    "PNTHR Racing": "09 PNTHR Racing.png",
+    "PNTHR": "09 PNTHR Racing.png",
+}
+
+
+def load_podium_logos_b64(podios_dir: str) -> dict:
+    """Load base64-encoded transparent PNG logos (downscaled to 360x360 max) from Podios/."""
+    logos = {}
+    if not os.path.isdir(podios_dir):
+        return logos
+    for team_name, filename in PODIUM_LOGO_FILES.items():
+        chosen_path = os.path.join(podios_dir, filename)
+        b64 = get_base64_encoded_image(chosen_path, max_size=(360, 360))
+        if b64:
+            logos[team_name] = b64
+    return logos
+
+
+def get_podium_logo_html(team_name: str, podium_logos_b64: dict, height: int = 72, fallback_emoji: str = "🏎️") -> str:
+    """Return a borderless transparent PNG logo for the podium ceremony."""
+    b64 = podium_logos_b64.get(str(team_name).strip(), "") if podium_logos_b64 else ""
+    if b64:
+        return (
+            f'<img src="data:image/png;base64,{b64}" alt="{team_name}" '
+            f'style="height:{height}px; width:auto; max-width:100%; object-fit:contain; '
+            f'display:inline-block; vertical-align:middle; '
+            f'filter:drop-shadow(0 4px 12px rgba(0,0,0,0.65));" />'
+        )
+    return f'<span style="font-size:{int(height*0.6)}px; line-height:1;">{fallback_emoji}</span>'
+
+
+def get_podium_medal_svg(rank: int, size: int = 56) -> str:
+    """Return an embossed scalloped laurel-wreath medal as a base64 SVG <img> (immune to HTML sanitization)."""
+    import math
+    palettes = {
+        1: ("#FFF3A8", "#F4B928", "#C8830A", "#7A4B00"),
+        2: ("#FFFFFF", "#C6CBD3", "#828892", "#474B52"),
+        3: ("#FFC999", "#D47B3E", "#944616", "#582709"),
+    }
+    hi, mid, dark, stroke_c = palettes.get(rank, palettes[1])
+    gid = f"srMedal_{rank}"
+
+    # Build a 24-lobe scalloped coin perimeter around (50, 50)
+    pts = []
+    n_lobes = 24
+    for i in range(n_lobes * 2):
+        ang = (math.pi * 2 * i) / (n_lobes * 2)
+        r = 47.0 if i % 2 == 0 else 43.2
+        x = 50.0 + r * math.cos(ang)
+        y = 50.0 + r * math.sin(ang)
+        pts.append(f"{x:.1f},{y:.1f}")
+    scallop_d = "M " + " L ".join(pts) + " Z"
+
+    # Build symmetric laurel leaves along left and right arcs
+    leaves_left = []
+    leaves_right = []
+    for deg_pos, rot_deg in [(125, -20), (144, -40), (163, -60), (182, -82), (201, -104), (220, -126), (238, -148)]:
+        rad = math.radians(deg_pos)
+        lx = 50.0 + 28.5 * math.cos(rad)
+        ly = 50.0 + 28.5 * math.sin(rad)
+        leaves_left.append(f'<ellipse cx="{lx:.1f}" cy="{ly:.1f}" rx="5.2" ry="2.5" transform="rotate({rot_deg} {lx:.1f} {ly:.1f})"/>')
+        rx = 100.0 - lx
+        leaves_right.append(f'<ellipse cx="{rx:.1f}" cy="{ly:.1f}" rx="5.2" ry="2.5" transform="rotate({-rot_deg} {rx:.1f} {ly:.1f})"/>')
+
+    svg = (
+        f'<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">'
+        f'<defs>'
+        f'<linearGradient id="{gid}_rim" x1="15%" y1="10%" x2="85%" y2="90%">'
+        f'<stop offset="0%" stop-color="{hi}"/><stop offset="50%" stop-color="{mid}"/><stop offset="100%" stop-color="{dark}"/>'
+        f'</linearGradient>'
+        f'<linearGradient id="{gid}_face" x1="20%" y1="15%" x2="80%" y2="85%">'
+        f'<stop offset="0%" stop-color="{mid}"/><stop offset="45%" stop-color="{hi}"/><stop offset="100%" stop-color="{dark}"/>'
+        f'</linearGradient>'
+        f'</defs>'
+        f'<path d="{scallop_d}" fill="url(#{gid}_rim)" stroke="{stroke_c}" stroke-width="1.8"/>'
+        f'<circle cx="50" cy="50" r="37" fill="url(#{gid}_face)" stroke="{dark}" stroke-width="2"/>'
+        f'<circle cx="50" cy="50" r="33.5" fill="none" stroke="{hi}" stroke-width="0.9" opacity="0.7"/>'
+        f'<g fill="{hi}" stroke="{stroke_c}" stroke-width="0.85" opacity="0.95">'
+        + "".join(leaves_left) + "".join(leaves_right) +
+        f'</g>'
+        f'<text x="50" y="62" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-size="38" font-weight="900" fill="{hi}" stroke="{stroke_c}" stroke-width="2">{rank}</text>'
+        f'</svg>'
+    )
+    b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f'<img src="data:image/svg+xml;base64,{b64}" width="{size}" height="{size}" alt="{rank}" style="display:block; filter:drop-shadow(0 3px 6px rgba(0,0,0,0.42));" />'
 
 
 def get_team_logo_html(team_name: str, logos_b64: dict, height: int = 30, fallback_emoji: str = "🏎️") -> str:

@@ -207,3 +207,29 @@ I inspected the codebase and found **four specific bugs** in `app.py`, `data_pro
 ## 👤 User (2026-11-09T22:34:41Z)
 
 copy a log of this conversation so that i can open it from another computer, add it to the git
+
+---
+
+# Session 2 — Judging Rubric UI, Team Nomenclature, Logos & Podium Ceremony
+
+- **Conversation ID:** `febf84bd-9535-4264-ba92-e0a28ea5e657`
+- **Date:** `2026-11-12`
+
+## Summary of Changes
+
+1. **Judging Rubric & Scorecard UI (`app.py`, `styles.py`, `data_processor.py`, `plantilla_registro_jurado.csv`)**
+   - Created `plantilla_registro_jurado.csv` in transposed format (rows = 12 judging subcategories, columns = 9 teams) and updated `_try_parse_tabular_df` in `data_processor.py` to parse both standard and transposed rubric CSVs/Excel sheets.
+   - Compressed `"📝 Registro de Jurado"` layout, aligned category totals with the subcategory points columns, bolded category headers, added section dividers, removed page number references, and stripped noisy cell/container borders and excess `stNumberInput` padding.
+
+2. **Team Nomenclature & Logos (`Equipos_Nombres.csv`, `Equipos.csv`, `Logos/`, `assets/Logos/`, `Podios/`)**
+   - Standardized all team references across `app.py`, `data_processor.py`, `styles.py`, `judge_scores.csv`, `live_race_data.csv`, and `plantilla_registro_jurado.csv` to match `Equipos_Nombres.csv` (`Dim3nsion Motosport`, `Brader Raiders Racing Team`, `PNTHR Racing`, etc.), while retaining legacy alias resolution in `LEGACY_TEAM_MAP`.
+   - Rebuilt high-resolution team logos in `Logos/` from the `Entregables/` PDFs (vector paths and `/SMask` transparent PNGs).
+   - Compressed the team JPEGs in `assets/Logos/` (~33–67 KB each) and wired `styles.py` (`load_team_logos_b64`) and `app.py` (`_compute_branding_cache_key`) so edits to CSVs or logos automatically bust `@st.cache_data`.
+   - Wired the transparent `1400×1400` PNG logos in `Podios/` (`load_podium_logos_b64` / `get_podium_logo_html`) for the podium ceremony.
+
+3. **Podium Ceremony Redesign (`app.py`, `styles.py`, `assets/Animations/podium_dark_bg.gif`)**
+   - Removed the separate individual winner slides and bottom positions table (`#4–#9`) so the ceremony focuses exclusively on the 3-winner podium, with individual reveal buttons (`🔄 Intro`, `🏁 Portada`, `🥉 3er Lugar`, `🥈 2do Lugar`, `🥇 1er Lugar`) pushed below the fold (`320px` spacer) plus keyboard navigation (`ArrowRight` / `Space` / `PageDown` and `ArrowLeft` / `PageUp`).
+   - Created `assets/Animations/podium_dark_bg.gif` by keying out the white background of `assets/Animations/_.gif` and blending the waving checkered flag over the dark CFD `#05000B` radial-gradient backdrop.
+   - Expanded `.sr-podium-stage` to full-window width (`max-width: 100%`, `min-height: 84vh`, `padding-top: 3.0rem`) with metallic 3D cylindrical pedestals and base64-encoded scalloped laurel-wreath SVG medals (`get_podium_medal_svg`).
+   - Added a full-window pre-podium splash screen (`render_podium_logo_splash_slide`) showing the animated flag background with the centered STEM Racing Panamá logo, which shrinks, turns white, and morphs (`.sr-logo-morph-out` / `.sr-logo-morph-in`) into `Podios/SR - Mono White copy.png` in the top-left corner when advancing to 3rd place.
+   - Created backup snapshot in `design_backup_v3/`.

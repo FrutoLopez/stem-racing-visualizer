@@ -8,8 +8,10 @@ Fully adheres to official STEM Racing / F1 in Schools regulations:
 """
 
 import os
+import base64
 from datetime import datetime
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 
@@ -45,24 +47,42 @@ def format_pts(val: float) -> str:
 
 # Assets & Paths
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+PODIOS_DIR = os.path.join(os.path.dirname(__file__), "Podios")
 LOGO_PATH = os.path.join(ASSETS_DIR, "logo.png")
-TEAMS_CSV_PATH = os.path.join(os.path.dirname(__file__), "Equipos.csv")
+MONO_WHITE_LOGO_PATH = os.path.join(PODIOS_DIR, "SR - Mono White copy.png")
+TEAMS_CSV_PATH = os.path.join(os.path.dirname(__file__), "Equipos_Nombres.csv")
 LIVE_CSV_PATH = os.path.join(os.path.dirname(__file__), "live_race_data.csv")
 JUDGE_CSV_PATH = os.path.join(os.path.dirname(__file__), "judge_scores.csv")
 
 
+def _compute_branding_cache_key() -> tuple:
+    """Build a lightweight mtime signature so edits to team CSV, styles, or logos bust @st.cache_data."""
+    mtimes = []
+    for p in (TEAMS_CSV_PATH, os.path.join(os.path.dirname(__file__), "styles.py")):
+        mtimes.append(os.path.getmtime(p) if os.path.exists(p) else 0.0)
+    for folder in (os.path.join(ASSETS_DIR, "Logos"), PODIOS_DIR):
+        if os.path.isdir(folder):
+            for fn in sorted(os.listdir(folder)):
+                fp = os.path.join(folder, fn)
+                if os.path.isfile(fp):
+                    mtimes.append((folder, fn, os.path.getmtime(fp)))
+    return tuple(mtimes)
+
+
 @st.cache_data(show_spinner=False)
-def load_cached_branding_and_teams():
-    """Cache CSS, downscaled base64 logos, and official teams once to avoid disk I/O & memory spikes on reruns."""
+def load_cached_branding_and_teams(cache_key: tuple):
+    """Cache CSS, downscaled base64 logos, and team list once per file state to avoid disk I/O spikes."""
     css_str = styles.inject_custom_css()
-    main_logo = styles.get_base64_encoded_image(LOGO_PATH, max_size=(420, 160))
+    main_logo = styles.get_base64_encoded_image(LOGO_PATH, max_size=(640, 260))
+    mono_white_logo = styles.get_base64_encoded_image(MONO_WHITE_LOGO_PATH, max_size=(520, 240))
     t_logos = styles.load_team_logos_b64(ASSETS_DIR)
+    p_logos = styles.load_podium_logos_b64(PODIOS_DIR)
     teams = dp.load_teams_from_csv(TEAMS_CSV_PATH)
     matchups = dp.get_matchups(teams)
-    return css_str, main_logo, t_logos, teams, matchups
+    return css_str, main_logo, mono_white_logo, t_logos, p_logos, teams, matchups
 
 
-custom_css_str, logo_b64, team_logos_b64, official_teams, matchups_list = load_cached_branding_and_teams()
+custom_css_str, logo_b64, mono_white_logo_b64, team_logos_b64, podium_logos_b64, official_teams, matchups_list = load_cached_branding_and_teams(_compute_branding_cache_key())
 
 # Inject Custom CSS
 if hasattr(st, "html"):
@@ -197,6 +217,16 @@ def sync_store_from_disk_if_needed(store: dict) -> bool:
                         updated = True
             except Exception:
                 pass
+
+        teams_sig = tuple(official_teams)
+        if store.get("teams_sig") != teams_sig:
+            store["runs_df"] = normalize_runs_df(store.get("history_df"))
+            loaded_j = dp.load_judge_scores_from_csv(JUDGE_CSV_PATH, official_teams, {})
+            if loaded_j is not None and not loaded_j.empty:
+                store["custom_scores"] = loaded_j
+            store["teams_sig"] = teams_sig
+            store["version"] += 1
+            updated = True
     return updated
 
 
@@ -639,8 +669,66 @@ def render_podium_intro_slide():
     """)
 
 
-def render_podium_full_slide():
-    """Full podium presentation with 3D pedestals and positions 4-9 split side-by-side."""
+@st.cache_data(show_spinner=False)
+def load_podium_bg_gif_b64(cache_key: float) -> str:
+    """Load the podium background GIF from assets/Animations/ as base64 (preferring dark-blended version)."""
+    anim_dir = os.path.join(ASSETS_DIR, "Animations")
+    if os.path.isdir(anim_dir):
+        preferred = os.path.join(anim_dir, "podium_dark_bg.gif")
+        if os.path.exists(preferred):
+            with open(preferred, "rb") as f:
+                return base64.b64encode(f.read()).decode()
+        for fn in sorted(os.listdir(anim_dir)):
+            if fn.lower().endswith(".gif"):
+                fp = os.path.join(anim_dir, fn)
+                with open(fp, "rb") as f:
+                    return base64.b64encode(f.read()).decode()
+    return ""
+
+
+def _get_podium_bg_gif_b64() -> str:
+    anim_dir = os.path.join(ASSETS_DIR, "Animations")
+    mtime = 0.0
+    if os.path.isdir(anim_dir):
+        preferred = os.path.join(anim_dir, "podium_dark_bg.gif")
+        if os.path.exists(preferred):
+            mtime = os.path.getmtime(preferred)
+        else:
+            for fn in sorted(os.listdir(anim_dir)):
+                if fn.lower().endswith(".gif"):
+                    mtime = os.path.getmtime(os.path.join(anim_dir, fn))
+                    break
+    return load_podium_bg_gif_b64(mtime)
+
+
+def render_podium_logo_splash_slide():
+    """Full-window splash screen before the podium with the animated flag background and centered STEM Racing Panamá logo."""
+    gif_b64 = _get_podium_bg_gif_b64()
+    bg_gif_html = (
+        f'<img src="data:image/gif;base64,{gif_b64}" alt="" '
+        f'style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 0; pointer-events: none;" />'
+        if gif_b64 else ""
+    )
+    center_logo_html = (
+        f'<img src="data:image/png;base64,{logo_b64}" alt="STEM Racing Panamá" '
+        f'style="max-width: 560px; width: 68%; height: auto; filter: drop-shadow(0 10px 32px rgba(0,0,0,0.85));" />'
+        if logo_b64 else
+        '<div style="font-size: 48px; font-weight: 900; color: #FFFFFF;">STEM RACING PANAMÁ</div>'
+    )
+    render_html(f"""
+    <div key="podium-splash-{st.session_state.podium_anim_nonce}">
+        <div class="sr-podium-stage" style="position: relative; overflow: hidden; border-radius: 14px; width: 100%; max-width: none; min-height: 84vh; margin: 0; padding: 36px 28px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; background: rgba(12, 8, 24, 0.85);">
+            {bg_gif_html}
+            <div class="sr-anim-winner" style="position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; animation-delay: 0.1s;">
+                {center_logo_html}
+            </div>
+        </div>
+    </div>
+    """)
+
+
+def render_podium_full_slide(reveal_level: int = 3):
+    """Podium presentation with stretched GIF background and step-by-step 3rd -> 2nd -> 1st reveal."""
     if df_championship.empty:
         st.info("ℹ️ No hay datos de podio disponibles aún.")
         return
@@ -689,57 +777,66 @@ def render_podium_full_slide():
     table_4_6 = build_mini_table(t4_6)
     table_7_9 = build_mini_table(t7_9)
 
-    podium_ceremony_html = f"""
-    <div key="podium-full-{st.session_state.podium_anim_nonce}">
-        <div class="sr-podium-container" style="display: flex; justify-content: center; align-items: flex-end; gap: 20px; margin: 15px auto 20px auto; padding: 10px 0; max-width: 850px; width: 100%;">
-            <div class="sr-podium-col sr-podium-anim-2" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; max-width: 260px; min-width: 180px;">
-                <div style="text-align: center; margin-bottom: 14px;">
-                    <div style="font-size: 34px; margin-bottom: 4px;">🥈</div>
-                    <div style="margin-bottom: 4px;">{team_logo_only(t2_name, height=40)}</div>
-                    <div style="font-size: 18px; font-weight: 900; color: #FFFFFF; text-shadow: 0 2px 8px rgba(0,0,0,0.8); margin-top: 4px;">{t2_name}</div>
-                    <div style="font-size: 15px; font-weight: 800; color: #E6E8EB; margin-top: 2px;">{t2_pts} PTS</div>
-                </div>
-                <div class="sr-pedestal sr-pedestal-2" style="width: 100%; height: 180px; border-radius: 16px 16px 0 0; background: linear-gradient(180deg, #E6E8EB 0%, #767B85 100%); color: #0E1217; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 25px rgba(220, 225, 235, 0.4); border-top: 3px solid #FFFFFF; box-sizing: border-box;">
-                    <span style="font-size: 42px; line-height: 1;">2</span>
-                    <span style="font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px;">2do Lugar</span>
-                </div>
-            </div>
+    gif_b64 = _get_podium_bg_gif_b64()
+    bg_gif_html = (
+        f'<img src="data:image/gif;base64,{gif_b64}" alt="" '
+        f'style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 0; pointer-events: none;" />'
+        if gif_b64 else ""
+    )
+    if reveal_level == 1 and logo_b64 and mono_white_logo_b64:
+        sr_logo_html = (
+            f'<img src="data:image/png;base64,{logo_b64}" alt="" class="sr-logo-morph-out" />'
+            f'<img src="data:image/png;base64,{mono_white_logo_b64}" alt="STEM Racing" class="sr-logo-morph-in" />'
+        )
+    else:
+        sr_logo_html = (
+            f'<img src="data:image/png;base64,{mono_white_logo_b64}" alt="STEM Racing" '
+            f'style="position: absolute; top: 24px; left: 28px; height: 82px; width: auto; z-index: 2; pointer-events: none; filter: drop-shadow(0 2px 10px rgba(0,0,0,0.7));" />'
+            if mono_white_logo_b64 else ""
+        )
 
-            <div class="sr-podium-col sr-podium-anim-1" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; max-width: 260px; min-width: 180px;">
-                <div style="text-align: center; margin-bottom: 14px;">
-                    <div style="font-size: 42px; margin-bottom: 4px;">👑</div>
-                    <div style="margin-bottom: 4px;">{team_logo_only(t1_name, height=46)}</div>
-                    <div style="font-size: 22px; font-weight: 900; color: #FCBC00; text-shadow: 0 2px 10px rgba(252, 188, 0, 0.5); margin-top: 4px;">{t1_name}</div>
-                    <div style="font-size: 17px; font-weight: 900; color: #FCBC00; margin-top: 2px;">{t1_pts} PTS</div>
-                </div>
-                <div class="sr-pedestal sr-pedestal-1" style="width: 100%; height: 240px; border-radius: 16px 16px 0 0; background: linear-gradient(180deg, #FCBC00 0%, #B87C00 100%); color: #150C00; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 14px 40px rgba(0,0,0,0.6), 0 0 35px rgba(252, 188, 0, 0.55); border-top: 3px solid #FFF275; box-sizing: border-box;">
-                    <span style="font-size: 54px; line-height: 1;">1</span>
-                    <span style="font-size: 16px; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 6px;">CAMPEÓN</span>
-                </div>
-            </div>
+    # Reveal states: 1 = pop 3rd, 2 = 3rd visible + pop 2nd, 3 = 3rd & 2nd visible + pop 1st + table
+    col3_cls = "sr-podium-col sr-podium-anim-pop" if reveal_level == 1 else "sr-podium-col"
+    col3_vis = "visible" if reveal_level >= 1 else "hidden"
 
-            <div class="sr-podium-col sr-podium-anim-3" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; max-width: 260px; min-width: 180px;">
-                <div style="text-align: center; margin-bottom: 14px;">
-                    <div style="font-size: 34px; margin-bottom: 4px;">🥉</div>
-                    <div style="margin-bottom: 4px;">{team_logo_only(t3_name, height=40)}</div>
-                    <div style="font-size: 18px; font-weight: 900; color: #FFFFFF; text-shadow: 0 2px 8px rgba(0,0,0,0.8); margin-top: 4px;">{t3_name}</div>
-                    <div style="font-size: 15px; font-weight: 800; color: #ED6D05; margin-top: 2px;">{t3_pts} PTS</div>
-                </div>
-                <div class="sr-pedestal sr-pedestal-3" style="width: 100%; height: 140px; border-radius: 16px 16px 0 0; background: linear-gradient(180deg, #ED6D05 0%, #994400 100%); color: #190B00; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 25px rgba(237, 109, 5, 0.45); border-top: 3px solid #FFBE85; box-sizing: border-box;">
-                    <span style="font-size: 38px; line-height: 1;">3</span>
-                    <span style="font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px;">3er Lugar</span>
+    col2_cls = "sr-podium-col sr-podium-anim-pop" if reveal_level == 2 else "sr-podium-col"
+    col2_vis = "visible" if reveal_level >= 2 else "hidden"
+
+    col1_cls = "sr-podium-col sr-podium-anim-pop" if reveal_level == 3 else "sr-podium-col"
+    col1_vis = "visible" if reveal_level >= 3 else "hidden"
+
+    def build_cylinder_col(col_cls: str, col_vis: str, rank: int, team_name: str, pts_str: str, logo_h: int, ped_h: int, medal_sz: int) -> str:
+        medal_svg = styles.get_podium_medal_svg(rank, size=medal_sz)
+        logo_html = styles.get_podium_logo_html(team_name, podium_logos_b64, height=logo_h)
+        return f"""
+        <div class="{col_cls}" style="visibility: {col_vis}; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; max-width: 310px; min-width: 220px;">
+            <div style="text-align: center; margin-bottom: -16px; position: relative; z-index: 3;">
+                <div style="font-size: 21px; font-weight: 900; color: #FFFFFF; text-shadow: 0 2px 10px rgba(0,0,0,0.95); margin-bottom: 10px; letter-spacing: 0.3px;">{team_name}</div>
+                <div>{logo_html}</div>
+            </div>
+            <div style="position: relative; width: 100%; height: {ped_h}px; margin-top: 18px; background: linear-gradient(90deg, #8A8E94 0%, #C8CCD1 18%, #F4F6F9 45%, #D0D4D9 72%, #7D8086 100%); border-radius: 0 0 50% 50% / 0 0 22px 22px; box-shadow: 0 16px 32px rgba(0,0,0,0.68); display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 20px; box-sizing: border-box;">
+                <div style="position: absolute; top: -18px; left: 0; right: 0; height: 36px; border-radius: 50%; background: radial-gradient(ellipse at 50% 45%, #7B7E84 0%, #52555B 70%, #3E4045 100%); border: 1.5px solid rgba(255, 255, 255, 0.35); box-shadow: inset 0 2px 6px rgba(0,0,0,0.45); z-index: 2;"></div>
+                <div style="position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;">
+                    {medal_svg}
+                    <div style="font-size: 19px; font-weight: 900; color: #111111; letter-spacing: 0.4px;">{pts_str} PTS</div>
                 </div>
             </div>
         </div>
+        """
 
-        <div class="sr-podium-anim-table" style="max-width: 860px; margin: 16px auto 20px auto;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-                <div>
-                    {table_4_6}
-                </div>
-                <div>
-                    {table_7_9}
-                </div>
+    col2_html = build_cylinder_col(col2_cls, col2_vis, 2, t2_name, t2_pts, logo_h=142, ped_h=195, medal_sz=70)
+    col1_html = build_cylinder_col(col1_cls, col1_vis, 1, t1_name, t1_pts, logo_h=166, ped_h=265, medal_sz=82)
+    col3_html = build_cylinder_col(col3_cls, col3_vis, 3, t3_name, t3_pts, logo_h=132, ped_h=150, medal_sz=64)
+
+    podium_ceremony_html = f"""
+    <div key="podium-full-{reveal_level}-{st.session_state.podium_anim_nonce}">
+        <div class="sr-podium-stage" style="position: relative; overflow: hidden; border-radius: 14px; width: 100%; max-width: none; min-height: 84vh; margin: 0; padding: 36px 28px 44px 28px; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box; background: rgba(12, 8, 24, 0.85);">
+            {bg_gif_html}
+            {sr_logo_html}
+            <div class="sr-podium-container" style="position: relative; z-index: 1; display: flex; justify-content: center; align-items: flex-end; gap: 48px; margin: 0 auto; padding: 10px 0 0 0; max-width: 1220px; width: 100%;">
+                {col2_html}
+                {col1_html}
+                {col3_html}
             </div>
         </div>
     </div>
@@ -1402,7 +1499,18 @@ elif selected_view == "🏆 Ceremonia de Podio":
     live_visualizer_sync_watcher()
     curr_step = int(st.session_state.podium_slide_step)
 
-    # Botones de navegación de la ceremonia (mínimo espacio vertical)
+    # Render Current Ceremony Slide (0: Intro -> 1: Logo Splash -> 2: Pop 3ro -> 3: Pop 2do -> 4: Pop 1ro)
+    if curr_step == 0:
+        render_podium_intro_slide()
+    elif curr_step == 1:
+        render_podium_logo_splash_slide()
+    else:
+        render_podium_full_slide(reveal_level=min(3, max(1, curr_step - 1)))
+
+    # Empujar los botones bastante más abajo para que no salgan en la pantalla principal
+    st.markdown("<div style='height: 320px;'></div>", unsafe_allow_html=True)
+
+    # Botones de navegación de la ceremonia (en la parte inferior)
     if curr_step == 0:
         _, col_start, _ = st.columns([1, 1.6, 1])
         with col_start:
@@ -1411,42 +1519,72 @@ elif selected_view == "🏆 Ceremonia de Podio":
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
     else:
-        col_nav1, col_nav2, col_nav3 = st.columns([1.2, 1, 1.4])
-        with col_nav1:
-            if st.button("⬅️ Diapositiva Anterior", use_container_width=True):
-                st.session_state.podium_slide_step = max(0, curr_step - 1)
-                st.session_state.podium_anim_nonce += 1
-                st.rerun()
-        with col_nav2:
-            if st.button("🔄 Reiniciar Intro", use_container_width=True):
+        col_nav0, col_nav_logo, col_nav3rd, col_nav2nd, col_nav1st = st.columns([0.8, 0.9, 1.0, 1.0, 1.0])
+        with col_nav0:
+            if st.button("🔄 Intro", use_container_width=True):
                 st.session_state.podium_slide_step = 0
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
-        with col_nav3:
-            next_labels = {
-                1: "Siguiente: Revelar 2do Lugar ➡️",
-                2: "Siguiente: Revelar 1er Lugar ➡️",
-                3: "Siguiente: Ver Podio Completo ➡️",
-                4: "🏆 Podio Completo en Pantalla"
-            }
-            if st.button(next_labels.get(curr_step, "Siguiente ➡️"), use_container_width=True, type="primary", disabled=(curr_step >= 4)):
-                st.session_state.podium_slide_step = min(4, curr_step + 1)
+        with col_nav_logo:
+            if st.button("🏁 Portada", use_container_width=True, type="secondary"):
+                st.session_state.podium_slide_step = 1
+                st.session_state.podium_anim_nonce += 1
+                st.rerun()
+        with col_nav3rd:
+            if st.button("🥉 3er Lugar", use_container_width=True, type="primary" if curr_step == 1 else "secondary"):
+                st.session_state.podium_slide_step = 2
+                st.session_state.podium_anim_nonce += 1
+                st.rerun()
+        with col_nav2nd:
+            if st.button("🥈 2do Lugar", use_container_width=True, type="primary" if curr_step == 2 else "secondary"):
+                st.session_state.podium_slide_step = 3
+                st.session_state.podium_anim_nonce += 1
+                st.rerun()
+        with col_nav1st:
+            if st.button("🥇 1er Lugar", use_container_width=True, type="primary" if curr_step == 3 else "secondary"):
+                st.session_state.podium_slide_step = 4
                 st.session_state.podium_anim_nonce += 1
                 st.rerun()
 
-    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-
-    # Render Current Ceremony Slide (0: Intro -> 1: 3ro -> 2: 2do -> 3: 1ro -> 4: Podio)
-    if curr_step == 0:
-        render_podium_intro_slide()
-    elif curr_step == 1:
-        render_place_reveal_slide(rank_target=3, medal_emoji="🥉", title="3er Lugar", accent_color="#CD7F32")
-    elif curr_step == 2:
-        render_place_reveal_slide(rank_target=2, medal_emoji="🥈", title="2do Lugar", accent_color="#C0C0C0")
-    elif curr_step == 3:
-        render_place_reveal_slide(rank_target=1, medal_emoji="🥇", title="1er Lugar - Campeón", accent_color="#FFD700")
-    else:
-        render_podium_full_slide()
+    # Keyboard navigation (ArrowRight / Space / PageDown to advance, ArrowLeft / PageUp to go back)
+    next_btn_match = {0: "Comenzar Ceremonia", 1: "3er Lugar", 2: "2do Lugar", 3: "1er Lugar"}.get(curr_step, "")
+    prev_btn_match = {1: "Intro", 2: "Portada", 3: "3er Lugar", 4: "2do Lugar"}.get(curr_step, "")
+    components.html(f"""
+    <script>
+    (function() {{
+        const pDoc = window.parent.document;
+        if (window.parent._srPodiumKeyHandler) {{
+            pDoc.removeEventListener('keydown', window.parent._srPodiumKeyHandler);
+        }}
+        function clickMatchingButton(labelSubstr) {{
+            if (!labelSubstr) return;
+            const btns = pDoc.querySelectorAll('button');
+            for (const btn of btns) {{
+                if (btn.innerText && btn.innerText.includes(labelSubstr)) {{
+                    btn.click();
+                    return;
+                }}
+            }}
+        }}
+        window.parent._srPodiumKeyHandler = function(e) {{
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+            if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {{
+                if ({'true' if next_btn_match else 'false'}) {{
+                    e.preventDefault();
+                    clickMatchingButton({next_btn_match!r});
+                }}
+            }} else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {{
+                if ({'true' if prev_btn_match else 'false'}) {{
+                    e.preventDefault();
+                    clickMatchingButton({prev_btn_match!r});
+                }}
+            }}
+        }};
+        pDoc.addEventListener('keydown', window.parent._srPodiumKeyHandler);
+    }})();
+    </script>
+    """, height=0)
 
 elif selected_view == "📝 Registro de Jurado":
     # -------------------------------------------------------------------------
@@ -1547,13 +1685,18 @@ elif selected_view == "📝 Registro de Jurado":
                     else:
                         cat_current_sum += float(cur_subcats.get(s_key, 0.0))
 
-                # Category Header Row (Dark theme with category color accent)
-                render_html(f"""
-                <div class="sr-jurado-cat-head" style="border-left-color: {cat_color};">
-                    <span class="sr-jurado-cat-name">{cat_off_label}</span>
-                    <span class="sr-jurado-cat-badge">{min(float(cat_max), cat_current_sum):.0f} / {cat_max} pts</span>
-                </div>
-                """)
+                # Category Header Row (Aligned with subcategory columns)
+                c_cat1, c_cat2, c_cat3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
+                with c_cat1:
+                    render_html(f"""
+                    <div class="sr-jurado-cat-head">
+                        <span class="sr-jurado-cat-name" style="color: {cat_color};">{cat_off_label}</span>
+                    </div>
+                    """)
+                with c_cat2:
+                    render_html(f'<div class="sr-jurado-cat-pts">{cat_max} pts</div>')
+                with c_cat3:
+                    render_html(f'<div class="sr-jurado-cat-badge">{min(float(cat_max), cat_current_sum):.0f} pts</div>')
 
                 # Subcategory rows
                 for sub_item in cat_cfg["subcategories"]:
@@ -1583,13 +1726,18 @@ elif selected_view == "📝 Registro de Jurado":
             # Visual divider before Racing section
             render_html('<div class="sr-jurado-divider"></div>')
 
-            # Racing Row (Dark theme, cyan accent)
-            render_html(f"""
-            <div class="sr-jurado-racing-head">
-                <span class="sr-jurado-cat-name" style="color: #009FE3;">Racing</span>
-                <span class="sr-jurado-cat-badge" style="color: #009FE3; background: rgba(0,159,227,0.14); border-color: rgba(0,159,227,0.4);">{racing_subtotal:.1f} / 220 pts</span>
-            </div>
-            """)
+            # Racing Row (Aligned with subcategory columns)
+            c_rc1, c_rc2, c_rc3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
+            with c_rc1:
+                render_html("""
+                <div class="sr-jurado-racing-head">
+                    <span class="sr-jurado-cat-name" style="color: #009FE3;">Racing</span>
+                </div>
+                """)
+            with c_rc2:
+                render_html('<div class="sr-jurado-cat-pts" style="color: #009FE3;">220 pts</div>')
+            with c_rc3:
+                render_html(f'<div class="sr-jurado-sub-val" style="color: #009FE3; font-weight: 900; font-size: 12px; height: 24px;">{racing_subtotal:.1f} pts</div>')
 
             # Racing sub-rows: Time Trials & Reaction Racing
             c_r1, c_r2, c_r3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
@@ -1755,7 +1903,7 @@ else:
         </div>
         """)
 
-        # Preserve strict official team order from Equipos.csv
+        # Preserve strict team order from Equipos_Nombres.csv
         order_dict = {tm: idx + 1 for idx, tm in enumerate(official_teams)}
         t1_df = df_teams_summary.copy()
         t1_df['team_order'] = t1_df['team'].map(order_dict).fillna(999).astype(int)

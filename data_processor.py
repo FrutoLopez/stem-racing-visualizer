@@ -68,10 +68,10 @@ DEFAULT_TEAMS = [
     "Excalibur",
     "Rayo Rabin",
     "Hayai Aerodynamics",
-    "Dim3nsion",
-    "Raiders",
+    "Dim3nsion Motosport",
+    "Brader Raiders Racing Team",
     "Cybercolts Racing",
-    "PNTHR"
+    "PNTHR Racing"
 ]
 
 LEGACY_TEAM_MAP = {
@@ -80,10 +80,16 @@ LEGACY_TEAM_MAP = {
     "Oxford": "Excalibur",
     "Isaac Rabin": "Rayo Rabin",
     "Panamerican": "Hayai Aerodynamics",
-    "Sun Yat Sen": "Dim3nsion",
-    "Brader": "Raiders",
+    "Sun Yat Sen": "Dim3nsion Motosport",
+    "Dim3nsion": "Dim3nsion Motosport",
+    "Dim3nsion Motorsport": "Dim3nsion Motosport",
+    "Dim3nsion Motorsports": "Dim3nsion Motosport",
+    "Brader": "Brader Raiders Racing Team",
+    "Raiders": "Brader Raiders Racing Team",
+    "Brader Raiders": "Brader Raiders Racing Team",
     "TJS": "Cybercolts Racing",
-    "Casco": "PNTHR",
+    "Casco": "PNTHR Racing",
+    "PNTHR": "PNTHR Racing",
     "ISP": "ISP",
 }
 
@@ -95,12 +101,12 @@ SCHOOL_TO_TEAM_MAP = {
     "oxford": "Excalibur",
     "isaac rabin": "Rayo Rabin",
     "panamerican": "Hayai Aerodynamics",
-    "sun yat sen": "Dim3nsion",
-    "chino panameño": "Dim3nsion",
-    "brader": "Raiders",
+    "sun yat sen": "Dim3nsion Motosport",
+    "chino panameño": "Dim3nsion Motosport",
+    "brader": "Brader Raiders Racing Team",
     "thomas jefferson": "Cybercolts Racing",
     "tjs": "Cybercolts Racing",
-    "casco": "PNTHR",
+    "casco": "PNTHR Racing",
     "isp": "ISP",
     "international school of panama": "ISP",
 }
@@ -111,29 +117,33 @@ TEAM_TO_SCHOOL_MAP = {
     "Excalibur": "The Oxford School",
     "Rayo Rabin": "Colegio Isaac Rabin",
     "Hayai Aerodynamics": "Panamerican School",
+    "Dim3nsion Motosport": "Centro Cultural Chino Panameño (Sun Yat Sen)",
     "Dim3nsion": "Centro Cultural Chino Panameño (Sun Yat Sen)",
+    "Brader Raiders Racing Team": "Colegio Brader",
     "Raiders": "Colegio Brader",
     "Cybercolts Racing": "Thomas Jefferson School (TJS)",
+    "PNTHR Racing": "The Casco School",
     "PNTHR": "The Casco School",
     "ISP": "International School of Panama (ISP)",
 }
 
 
-def load_teams_from_csv(path: str = "Equipos.csv") -> List[str]:
+def load_teams_from_csv(path: str = "Equipos_Nombres.csv") -> List[str]:
     """
-    Load official team names from CSV preserving their exact defined order.
-    Falling back to DEFAULT_TEAMS if file cannot be read.
+    Load team names from CSV preserving their exact defined order.
+    Falling back to Equipos.csv or DEFAULT_TEAMS if file cannot be read.
     """
-    if os.path.exists(path):
-        try:
-            df = pd.read_csv(path)
-            if not df.empty:
-                teams = df.iloc[:, 0].dropna().astype(str).str.strip().tolist()
-                teams = [t for t in teams if t]
-                if teams:
-                    return teams
-        except Exception:
-            pass
+    for candidate in (path, "Equipos_Nombres.csv", "Equipos.csv"):
+        if candidate and os.path.exists(candidate):
+            try:
+                df = pd.read_csv(candidate)
+                if not df.empty:
+                    teams = df.iloc[:, 0].dropna().astype(str).str.strip().tolist()
+                    teams = [t for t in teams if t]
+                    if teams:
+                        return teams
+            except Exception:
+                pass
     return DEFAULT_TEAMS.copy()
 
 
@@ -141,7 +151,7 @@ def get_matchups(teams: List[str]) -> List[Dict[str, Any]]:
     """
     Build the official head-to-head pairings based on team order:
     1 vs 2, 3 vs 4, 5 vs 6, 7 vs 8, and if an odd number of teams (9),
-    team 9 (PNTHR) races solo in Enfrentamiento 5 for all scoring purposes.
+    team 9 (PNTHR Racing) races solo in Enfrentamiento 5 for all scoring purposes.
     """
     matchups = []
     n = len(teams)
