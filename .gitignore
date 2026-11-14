@@ -14,3 +14,4 @@ scratch_pdf.py
 scratch_pdf_clean.py
 *.tmp
 *.bak
+auth_config.json

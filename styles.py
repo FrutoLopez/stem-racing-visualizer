@@ -938,52 +938,52 @@ div[data-testid="stMainBlockContainer"]:has(.sr-editor-mobile) .stCheckbox label
    REGISTRO DE JURADO - COMPACT DARK MOTORSPORT SCORECARD STYLES
    ========================================================================== */
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) {
-    gap: 1px !important;
+    gap: 6px !important;
     background: transparent !important;
     border: none !important;
     border-radius: 0px !important;
-    padding: 0px 4px !important;
+    padding: 4px 6px !important;
     box-shadow: none !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stHorizontalBlock"] {
-    gap: 6px !important;
+    gap: 8px !important;
     align-items: center !important;
-    margin-bottom: 0px !important;
-    margin-top: 0px !important;
+    margin-bottom: 2px !important;
+    margin-top: 2px !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"],
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInputContainer"] {
     margin: 0 !important;
     padding: 0 !important;
-    min-height: 22px !important;
-    height: 22px !important;
+    min-height: 32px !important;
+    height: auto !important;
     border: none !important;
     box-shadow: none !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] div[data-baseweb="input"],
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] div[data-baseweb="base-input"] {
-    min-height: 22px !important;
-    height: 22px !important;
+    min-height: 32px !important;
+    height: 32px !important;
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    background: rgba(255, 255, 255, 0.06) !important;
-    border-radius: 3px !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-radius: 6px !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] input {
-    padding: 0 2px !important;
+    padding: 0 4px !important;
     margin: 0 !important;
-    font-size: 12px !important;
+    font-size: 13px !important;
     font-weight: 800 !important;
-    height: 22px !important;
-    min-height: 22px !important;
-    line-height: 22px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    line-height: 30px !important;
     border: none !important;
 }
 div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data-testid="stNumberInput"] button {
-    height: 22px !important;
-    min-height: 22px !important;
-    width: 22px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    width: 28px !important;
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
@@ -991,21 +991,21 @@ div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data
 }
 .sr-jurado-divider {
     height: 1px;
-    background: rgba(255, 255, 255, 0.08);
-    margin: 3px 0 2px 0;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 8px 0 4px 0;
 }
 .sr-jurado-cat-head {
     display: flex;
     align-items: center;
     background: transparent;
     border: none;
-    height: 24px;
-    padding: 0 4px;
+    min-height: 28px;
+    padding: 2px 4px;
     margin-top: 2px;
-    margin-bottom: 1px;
+    margin-bottom: 2px;
 }
 .sr-jurado-cat-name {
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 900;
     font-style: italic;
     color: #FFFFFF;
@@ -1016,36 +1016,37 @@ div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data
     background: transparent;
     color: #FFFFFF;
     font-weight: 900;
-    font-size: 11.5px;
-    padding: 0 4px;
+    font-size: 12px;
+    padding: 2px 4px;
     border: none;
-    height: 24px;
+    min-height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
 }
 .sr-jurado-cat-badge {
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 900;
     color: #FCBC00;
     background: transparent;
     border: none;
-    height: 24px;
+    min-height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 0 4px;
+    padding: 2px 4px;
 }
 .sr-jurado-sub-label {
     background: transparent;
     color: #E8E8F0;
     font-weight: 500;
-    font-size: 11.5px;
-    padding: 0 4px;
+    font-size: 12.5px;
+    padding: 2px 4px;
     border: none;
-    height: 22px;
+    min-height: 28px;
+    line-height: 1.3;
     display: flex;
     align-items: center;
 }
@@ -1053,10 +1054,10 @@ div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data
     background: transparent;
     color: #9A9AB0;
     font-weight: 700;
-    font-size: 11px;
-    padding: 0 4px;
+    font-size: 11.5px;
+    padding: 2px 4px;
     border: none;
-    height: 22px;
+    min-height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1066,10 +1067,10 @@ div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data
     background: transparent;
     color: #009FE3;
     font-weight: 800;
-    font-size: 11.5px;
-    padding: 0 4px;
+    font-size: 12.5px;
+    padding: 2px 4px;
     border: none;
-    height: 22px;
+    min-height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1080,10 +1081,10 @@ div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data
     align-items: center;
     background: transparent;
     border: none;
-    height: 24px;
-    padding: 0 4px;
+    min-height: 28px;
+    padding: 2px 4px;
     margin-top: 2px;
-    margin-bottom: 1px;
+    margin-bottom: 2px;
 }
 .sr-jurado-total-head {
     display: flex;
@@ -1092,8 +1093,8 @@ div[data-testid="stVerticalBlock"]:has(> div .sr-jurado-compact-marker) div[data
     background: transparent;
     border: none;
     border-top: 1px solid rgba(252, 188, 0, 0.35);
-    padding: 6px 4px 2px 4px;
-    margin-top: 4px;
+    padding: 10px 4px 6px 4px;
+    margin-top: 8px;
 }
 div[data-testid="stNumberInput"] input {
     text-align: center !important;

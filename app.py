@@ -9,6 +9,10 @@ Fully adheres to official STEM Racing / F1 in Schools regulations:
 
 import os
 import base64
+import json
+import hashlib
+import hmac
+import secrets
 from datetime import datetime
 import streamlit as st
 import streamlit.components.v1 as components
@@ -51,6 +55,109 @@ MONO_WHITE_LOGO_PATH = os.path.join(PODIOS_DIR, "SR - Mono White copy.png")
 TEAMS_CSV_PATH = os.path.join(os.path.dirname(__file__), "Equipos_Nombres.csv")
 LIVE_CSV_PATH = os.path.join(os.path.dirname(__file__), "live_race_data.csv")
 JUDGE_CSV_PATH = os.path.join(os.path.dirname(__file__), "judge_scores.csv")
+AUTH_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "auth_config.json")
+
+
+def _hash_password(password: str, salt_hex: str) -> str:
+    """Hash a password with PBKDF2-HMAC-SHA256 using the given hex salt."""
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        bytes.fromhex(salt_hex),
+        100_000
+    ).hex()
+
+
+def _write_auth_config(cfg: dict) -> None:
+    """Atomically persist auth configuration JSON to disk."""
+    tmp_path = f"{AUTH_CONFIG_PATH}.tmp"
+    with dp.CSV_LOCK:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except OSError:
+                pass
+        os.replace(tmp_path, AUTH_CONFIG_PATH)
+
+
+def _load_or_init_auth_config() -> dict:
+    """Load persisted admin credentials, or initialize default (admi / admi) if missing."""
+    with dp.CSV_LOCK:
+        if os.path.exists(AUTH_CONFIG_PATH):
+            try:
+                with open(AUTH_CONFIG_PATH, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                if (
+                    isinstance(cfg, dict)
+                    and isinstance(cfg.get("username"), str)
+                    and isinstance(cfg.get("salt"), str)
+                    and isinstance(cfg.get("password_hash"), str)
+                ):
+                    return cfg
+            except Exception:
+                pass
+        salt_hex = secrets.token_hex(16)
+        default_cfg = {
+            "username": "admi",
+            "salt": salt_hex,
+            "password_hash": _hash_password("admi", salt_hex),
+        }
+        _write_auth_config(default_cfg)
+        return default_cfg
+
+
+def _verify_admin_credentials(username: str, password: str) -> bool:
+    """Verify username and password against stored PBKDF2-HMAC-SHA256 credentials."""
+    cfg = _load_or_init_auth_config()
+    u_ok = hmac.compare_digest(str(username).strip(), cfg["username"])
+    p_hash = _hash_password(str(password), cfg["salt"])
+    p_ok = hmac.compare_digest(p_hash, cfg["password_hash"])
+    return bool(u_ok and p_ok)
+
+
+def _update_admin_password(current_password: str, new_password: str) -> tuple:
+    """Verify current password and update stored password hash with a fresh salt."""
+    cfg = _load_or_init_auth_config()
+    cur_hash = _hash_password(str(current_password), cfg["salt"])
+    if not hmac.compare_digest(cur_hash, cfg["password_hash"]):
+        return False, "La contraseña actual es incorrecta."
+    if not new_password:
+        return False, "La nueva contraseña no puede estar vacía."
+    new_salt = secrets.token_hex(16)
+    updated_cfg = {
+        "username": cfg["username"],
+        "salt": new_salt,
+        "password_hash": _hash_password(str(new_password), new_salt),
+    }
+    _write_auth_config(updated_cfg)
+    return True, "Contraseña actualizada correctamente."
+
+
+def render_login_panel(context_key: str, title: str = "🔐 Acceso de Administrador") -> None:
+    """Render a centered login card for protected editing/upload views."""
+    _, col_mid, _ = st.columns([1, 1.4, 1])
+    with col_mid:
+        render_html(f"""
+        <div style="background: rgba(18, 12, 36, 0.9); border: 1px solid rgba(230, 0, 126, 0.45); border-radius: 14px; padding: 20px 24px; margin: 20px 0 14px 0; text-align: center;">
+            <div style="font-size: 22px; font-weight: 900; color: #FFFFFF; margin-bottom: 6px;">{title}</div>
+            <div style="font-size: 13px; color: #A09EB8;">
+                Esta sección permite modificar o subir datos del torneo. Inicia sesión para continuar.
+            </div>
+        </div>
+        """)
+        with st.form(key=f"login_form_{context_key}"):
+            u_in = st.text_input("Usuario", key=f"login_user_{context_key}")
+            p_in = st.text_input("Contraseña", type="password", key=f"login_pass_{context_key}")
+            if st.form_submit_button("🔓 Iniciar Sesión", type="primary", width='stretch'):
+                if _verify_admin_credentials(u_in, p_in):
+                    st.session_state["is_admin_authenticated"] = True
+                    st.session_state["admin_username"] = str(u_in).strip()
+                    st.toast("✅ Sesión iniciada correctamente.")
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario o contraseña incorrectos.")
 
 
 def _compute_branding_cache_key() -> tuple:
@@ -96,6 +203,8 @@ def _load_transparent_xl_logo_b64(path: str) -> str:
 @st.cache_data(show_spinner=False)
 def load_cached_branding_and_teams(cache_key: tuple):
     """Cache CSS, downscaled base64 logos, and team list once per file state to avoid disk I/O spikes."""
+    import importlib
+    importlib.reload(styles)
     css_str = styles.inject_custom_css()
     main_logo = styles.get_base64_encoded_image(LOGO_PATH, max_size=(640, 260))
     xl_logo = _load_transparent_xl_logo_b64(XL_LOGO_PATH) or main_logo
@@ -470,6 +579,44 @@ with st.sidebar:
         help="Actívalo solo en la pantalla proyectada cuando registres datos desde otro dispositivo (ej. celular). Mantenerlo apagado evita sobrecargar el navegador y el controlador gráfico."
     )
 
+    is_admin_auth = bool(st.session_state.get("is_admin_authenticated", False))
+    st.markdown("---")
+    st.markdown("### 🔐 Acceso Administrador")
+    if not is_admin_auth:
+        with st.expander("🔓 Iniciar Sesión (Edición / Carga)", expanded=False):
+            with st.form(key="sidebar_login_form"):
+                sb_user = st.text_input("Usuario", key="sb_login_user")
+                sb_pass = st.text_input("Contraseña", type="password", key="sb_login_pass")
+                if st.form_submit_button("🔓 Entrar", type="primary", width='stretch'):
+                    if _verify_admin_credentials(sb_user, sb_pass):
+                        st.session_state["is_admin_authenticated"] = True
+                        st.session_state["admin_username"] = str(sb_user).strip()
+                        st.toast("✅ Sesión iniciada.")
+                        st.rerun()
+                    else:
+                        st.error("❌ Usuario o contraseña incorrectos.")
+    else:
+        st.caption(f"✅ Sesión activa: **{st.session_state.get('admin_username', 'admi')}**")
+        with st.expander("🔑 Cambiar Contraseña", expanded=False):
+            with st.form(key="sidebar_change_pwd_form", clear_on_submit=True):
+                cur_pwd_in = st.text_input("Contraseña actual", type="password", key="sb_cur_pwd")
+                new_pwd_in = st.text_input("Nueva contraseña", type="password", key="sb_new_pwd")
+                conf_pwd_in = st.text_input("Confirmar nueva contraseña", type="password", key="sb_conf_pwd")
+                if st.form_submit_button("💾 Actualizar Contraseña", type="primary", width='stretch'):
+                    if new_pwd_in != conf_pwd_in:
+                        st.error("❌ Las contraseñas nuevas no coinciden.")
+                    else:
+                        ok, msg = _update_admin_password(cur_pwd_in, new_pwd_in)
+                        if ok:
+                            st.success(f"✅ {msg}")
+                        else:
+                            st.error(f"❌ {msg}")
+        if st.button("🚪 Cerrar Sesión", width='stretch', key="sb_logout_btn"):
+            st.session_state["is_admin_authenticated"] = False
+            st.session_state["admin_username"] = ""
+            st.toast("🔒 Sesión cerrada.")
+            st.rerun()
+
     st.markdown("---")
     st.markdown("### 📂 Archivo CSV de Carreras")
     export_df_sidebar = st.session_state.history_df if (st.session_state.history_df is not None and not st.session_state.history_df.empty) else pd.DataFrame(columns=dp.CSV_SCHEMA)
@@ -484,85 +631,88 @@ with st.sidebar:
         help="Descarga una copia del archivo CSV con todos los registros e historial de timestamps."
     )
 
-    uploaded_race_csv = st.file_uploader(
-        "📤 Subir CSV para Visualizar:",
-        type=["csv"],
-        key="race_csv_uploader",
-        help="Sube un archivo CSV de carreras para cargar sus datos y probar las visualizaciones."
-    )
-    if uploaded_race_csv is not None:
-        file_sig = f"{uploaded_race_csv.name}_{uploaded_race_csv.size}"
-        auto_loaded = st.session_state.get("_last_uploaded_race_csv_sig") != file_sig
-        reload_clicked = st.button("🔄 Recargar CSV Subido", width='stretch', key="reload_uploaded_csv_btn")
-        if auto_loaded or reload_clicked:
-            uploaded_race_csv.seek(0)
-            loaded_csv_df = dp.load_runs_from_csv(uploaded_race_csv)
-            commit_runs_df(loaded_csv_df)
-            st.session_state["_last_uploaded_race_csv_sig"] = file_sig
-            st.toast(f"✅ CSV '{uploaded_race_csv.name}' cargado ({len(loaded_csv_df)} registros).")
-            st.rerun()
+    if is_admin_auth:
+        uploaded_race_csv = st.file_uploader(
+            "📤 Subir CSV para Visualizar:",
+            type=["csv"],
+            key="race_csv_uploader",
+            help="Sube un archivo CSV de carreras para cargar sus datos y probar las visualizaciones."
+        )
+        if uploaded_race_csv is not None:
+            file_sig = f"{uploaded_race_csv.name}_{uploaded_race_csv.size}"
+            auto_loaded = st.session_state.get("_last_uploaded_race_csv_sig") != file_sig
+            reload_clicked = st.button("🔄 Recargar CSV Subido", width='stretch', key="reload_uploaded_csv_btn")
+            if auto_loaded or reload_clicked:
+                uploaded_race_csv.seek(0)
+                loaded_csv_df = dp.load_runs_from_csv(uploaded_race_csv)
+                commit_runs_df(loaded_csv_df)
+                st.session_state["_last_uploaded_race_csv_sig"] = file_sig
+                st.toast(f"✅ CSV '{uploaded_race_csv.name}' cargado ({len(loaded_csv_df)} registros).")
+                st.rerun()
+            else:
+                st.caption(f"✅ Activo: `{uploaded_race_csv.name}` ({len(st.session_state.history_df)} filas)")
         else:
-            st.caption(f"✅ Activo: `{uploaded_race_csv.name}` ({len(st.session_state.history_df)} filas)")
-    else:
-        st.session_state["_last_uploaded_race_csv_sig"] = None
+            st.session_state["_last_uploaded_race_csv_sig"] = None
 
-    st.markdown("---")
-    st.markdown("### 📝 Rúbrica de Jueces")
-    uploaded_rubric_files = st.file_uploader(
-        "Subir Archivo(s) de Evaluación (.xlsx / .csv):",
-        type=["xlsx", "csv"],
-        accept_multiple_files=True,
-        key="rubric_file_uploader",
-        help="Sube uno o varios archivos Excel/CSV de evaluación ('STEM RACING - COMPETITION JUDGING BREAKDOWN') por equipo o tabla resumen."
-    )
-    if uploaded_rubric_files:
-        rubric_sig = "|".join(f"{f.name}_{f.size}" for f in uploaded_rubric_files)
-        auto_load_rubric = st.session_state.get("_last_uploaded_rubric_sig") != rubric_sig
-        reload_rubric_btn = st.button("🔄 Recargar Puntajes de Archivo(s)", width='stretch', key="reload_rubric_btn")
-        if auto_load_rubric or reload_rubric_btn:
-            parsed_scores, parse_msgs = dp.parse_judging_rubric_files(uploaded_rubric_files, official_teams)
-            st.session_state["_last_uploaded_rubric_msgs"] = parse_msgs
-            st.session_state["_last_uploaded_rubric_sig"] = rubric_sig
-            if parsed_scores and st.session_state.custom_scores is not None:
-                for t_name, cat_vals in parsed_scores.items():
-                    t_mask = st.session_state.custom_scores['team'] == t_name
-                    if t_mask.any():
-                        for cat_col, val in cat_vals.items():
-                            st.session_state.custom_scores.loc[t_mask, cat_col] = val
-                save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
-                st.toast(f"✅ Puntajes de jueces cargados para {len(parsed_scores)} equipo(s).")
-                st.rerun()
-        for msg in st.session_state.get("_last_uploaded_rubric_msgs", []):
-            st.caption(msg)
-    else:
-        st.session_state["_last_uploaded_rubric_sig"] = None
-        st.session_state["_last_uploaded_rubric_msgs"] = []
+        st.markdown("---")
+        st.markdown("### 📝 Rúbrica de Jueces")
+        uploaded_rubric_files = st.file_uploader(
+            "Subir Archivo(s) de Evaluación (.xlsx / .csv):",
+            type=["xlsx", "csv"],
+            accept_multiple_files=True,
+            key="rubric_file_uploader",
+            help="Sube uno o varios archivos Excel/CSV de evaluación ('STEM RACING - COMPETITION JUDGING BREAKDOWN') por equipo o tabla resumen."
+        )
+        if uploaded_rubric_files:
+            rubric_sig = "|".join(f"{f.name}_{f.size}" for f in uploaded_rubric_files)
+            auto_load_rubric = st.session_state.get("_last_uploaded_rubric_sig") != rubric_sig
+            reload_rubric_btn = st.button("🔄 Recargar Puntajes de Archivo(s)", width='stretch', key="reload_rubric_btn")
+            if auto_load_rubric or reload_rubric_btn:
+                parsed_scores, parse_msgs = dp.parse_judging_rubric_files(uploaded_rubric_files, official_teams)
+                st.session_state["_last_uploaded_rubric_msgs"] = parse_msgs
+                st.session_state["_last_uploaded_rubric_sig"] = rubric_sig
+                if parsed_scores and st.session_state.custom_scores is not None:
+                    for t_name, cat_vals in parsed_scores.items():
+                        t_mask = st.session_state.custom_scores['team'] == t_name
+                        if t_mask.any():
+                            for cat_col, val in cat_vals.items():
+                                st.session_state.custom_scores.loc[t_mask, cat_col] = val
+                    save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
+                    st.toast(f"✅ Puntajes de jueces cargados para {len(parsed_scores)} equipo(s).")
+                    st.rerun()
+            for msg in st.session_state.get("_last_uploaded_rubric_msgs", []):
+                st.caption(msg)
+        else:
+            st.session_state["_last_uploaded_rubric_sig"] = None
+            st.session_state["_last_uploaded_rubric_msgs"] = []
 
-    with st.expander("✏️ Editar Puntajes de Jueces Manualmente"):
-        if st.button("📝 Abrir Registro de Jurado", width='stretch', key="sidebar_goto_js_btn"):
-            st.session_state._pending_view_mode = "📝 Registro de Jurado"
-            st.rerun()
-        st.caption("Ajusta los puntajes evaluados por los jueces para el Podio General:")
-        if st.session_state.custom_scores is not None:
-            edited_rubric = st.data_editor(
-                st.session_state.custom_scores[['team', 'Identidad de Marca', 'Presentación Verbal', 'Especificaciones y Escrutinio', 'Diseño e Ingeniería', 'Gestión de Proyecto']],
-                hide_index=True,
-                width='stretch',
-                key="rubric_editor"
-            )
-            if st.button("💾 Guardar Puntajes de Jueces", width='stretch'):
-                for col in dp.NON_RACING_CATEGORIES:
-                    st.session_state.custom_scores[col] = pd.to_numeric(edited_rubric[col], errors='coerce').fillna(0.0).clip(
-                        lower=0.0, upper=float(dp.CATEGORY_MAX_POINTS.get(col, 200))
-                    )
-                save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
-                st.toast("✅ Puntajes de jueces guardados.")
+        with st.expander("✏️ Editar Puntajes de Jueces Manualmente"):
+            if st.button("📝 Abrir Registro de Jurado", width='stretch', key="sidebar_goto_js_btn"):
+                st.session_state._pending_view_mode = "📝 Registro de Jurado"
                 st.rerun()
-            if st.button("🔄 Poner Puntajes de Jueces en 0", width='stretch'):
-                zero_df = dp.get_default_category_scores(official_teams, racing_pts_map, zero_init=True)
-                save_and_sync_judge_scores(zero_df, racing_pts_map)
-                st.toast("🗑️ Puntajes de jueces reiniciados en 0.")
-                st.rerun()
+            st.caption("Ajusta los puntajes evaluados por los jueces para el Podio General:")
+            if st.session_state.custom_scores is not None:
+                edited_rubric = st.data_editor(
+                    st.session_state.custom_scores[['team', 'Identidad de Marca', 'Presentación Verbal', 'Especificaciones y Escrutinio', 'Diseño e Ingeniería', 'Gestión de Proyecto']],
+                    hide_index=True,
+                    width='stretch',
+                    key="rubric_editor"
+                )
+                if st.button("💾 Guardar Puntajes de Jueces", width='stretch'):
+                    for col in dp.NON_RACING_CATEGORIES:
+                        st.session_state.custom_scores[col] = pd.to_numeric(edited_rubric[col], errors='coerce').fillna(0.0).clip(
+                            lower=0.0, upper=float(dp.CATEGORY_MAX_POINTS.get(col, 200))
+                        )
+                    save_and_sync_judge_scores(st.session_state.custom_scores, racing_pts_map)
+                    st.toast("✅ Puntajes de jueces guardados.")
+                    st.rerun()
+                if st.button("🔄 Poner Puntajes de Jueces en 0", width='stretch'):
+                    zero_df = dp.get_default_category_scores(official_teams, racing_pts_map, zero_init=True)
+                    save_and_sync_judge_scores(zero_df, racing_pts_map)
+                    st.toast("🗑️ Puntajes de jueces reiniciados en 0.")
+                    st.rerun()
+    else:
+        st.caption("🔒 Inicia sesión arriba para subir CSVs, cargar rúbricas o editar puntajes.")
 
 df_championship = st.session_state.custom_scores
 
@@ -908,6 +1058,9 @@ if selected_view == "📝 Pantalla de Edición y Registro":
     # -------------------------------------------------------------------------
     # PANTALLA DE EDICIÓN Y REGISTRO EN VIVO
     # -------------------------------------------------------------------------
+    if not st.session_state.get("is_admin_authenticated", False):
+        render_login_panel("race_editor", "🔐 Acceso Requerido: Edición y Registro")
+        st.stop()
     if "editor_mobile_mode" not in st.session_state:
         st.session_state.editor_mobile_mode = False
     mobile_mode = bool(st.session_state.editor_mobile_mode)
@@ -1285,7 +1438,7 @@ if selected_view == "📝 Pantalla de Edición y Registro":
                     <div style="font-size: 18px; font-weight: 900; color: #FF8A00;">{tot_b_prev:.3f} s</div>
                 </div>""")
 
-        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
         submit_matchup_race = st.button(
             f"🏁 Guardar Resultados de Carrera {selected_race_num}",
             key=f"btn_save_race_{team_a}_{team_b}_{selected_race_num}",
@@ -1713,6 +1866,9 @@ elif selected_view == "📝 Registro de Jurado":
     # -------------------------------------------------------------------------
     # PANTALLA: REGISTRO DE JURADO (HOJA DE EVALUACIÓN POR EQUIPO)
     # -------------------------------------------------------------------------
+    if not st.session_state.get("is_admin_authenticated", False):
+        render_login_panel("judge_editor", "🔐 Acceso Requerido: Registro de Jurado")
+        st.stop()
 
     # Team selector state initialization
     if "judging_summary_team_idx" not in st.session_state:
@@ -1793,10 +1949,6 @@ elif selected_view == "📝 Registro de Jurado":
                 cat_max = cat_cfg["max_points"]
                 cat_color = cat_cfg.get("color", "#E6007E")
 
-                # Visual divider between sections (skip before the very first category)
-                if cat_idx > 0:
-                    render_html('<div class="sr-jurado-divider"></div>')
-
                 # Calculate live sum for this category
                 cat_current_sum = 0.0
                 for sub_item in cat_cfg["subcategories"]:
@@ -1807,18 +1959,18 @@ elif selected_view == "📝 Registro de Jurado":
                     else:
                         cat_current_sum += float(cur_subcats.get(s_key, 0.0))
 
-                # Category Header Row (Aligned with subcategory columns)
-                c_cat1, c_cat2, c_cat3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
-                with c_cat1:
-                    render_html(f"""
+                # Category Header Row (Single self-contained CSS Grid row aligned with [5.8, 2.0, 2.2] subcategory columns)
+                top_margin = "10px" if cat_idx > 0 else "2px"
+                top_border = "border-top: 1px solid rgba(255, 255, 255, 0.10); padding-top: 8px;" if cat_idx > 0 else "padding-top: 2px;"
+                render_html(f"""
+                <div style="display: grid; grid-template-columns: 5.8fr 2.0fr 2.2fr; gap: 8px; align-items: center; margin-top: {top_margin}; margin-bottom: 4px; {top_border} padding-bottom: 4px;">
                     <div class="sr-jurado-cat-head">
                         <span class="sr-jurado-cat-name" style="color: {cat_color};">{cat_off_label}</span>
                     </div>
-                    """)
-                with c_cat2:
-                    render_html(f'<div class="sr-jurado-cat-pts">{cat_max} pts</div>')
-                with c_cat3:
-                    render_html(f'<div class="sr-jurado-cat-badge">{min(float(cat_max), cat_current_sum):.0f} pts</div>')
+                    <div class="sr-jurado-cat-pts">{cat_max} pts</div>
+                    <div class="sr-jurado-cat-badge">{min(float(cat_max), cat_current_sum):.0f} pts</div>
+                </div>
+                """)
 
                 # Subcategory rows
                 for sub_item in cat_cfg["subcategories"]:
@@ -1845,56 +1997,42 @@ elif selected_view == "📝 Registro de Jurado":
                         )
                         new_subcat_inputs[s_key] = val_input
 
-            # Visual divider before Racing section
-            render_html('<div class="sr-jurado-divider"></div>')
-
-            # Racing Row (Aligned with subcategory columns)
-            c_rc1, c_rc2, c_rc3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
-            with c_rc1:
-                render_html("""
-                <div class="sr-jurado-racing-head">
-                    <span class="sr-jurado-cat-name" style="color: #009FE3;">Racing</span>
-                </div>
-                """)
-            with c_rc2:
-                render_html('<div class="sr-jurado-cat-pts" style="color: #009FE3;">220 pts</div>')
-            with c_rc3:
-                render_html(f'<div class="sr-jurado-sub-val" style="color: #009FE3; font-weight: 900; font-size: 12px; height: 24px;">{racing_subtotal:.1f} pts</div>')
-
-            # Racing sub-rows: Time Trials & Reaction Racing
-            c_r1, c_r2, c_r3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
-            with c_r1:
-                render_html('<div class="sr-jurado-sub-label">Time Trials</div>')
-            with c_r2:
-                render_html('<div class="sr-jurado-sub-pts">110 pts</div>')
-            with c_r3:
-                render_html(f'<div class="sr-jurado-sub-val">{tt_pts:.1f}</div>')
-
-            c_rx1, c_rx2, c_rx3 = st.columns([5.8, 2.0, 2.2], gap="small", vertical_alignment="center")
-            with c_rx1:
-                render_html('<div class="sr-jurado-sub-label">Reaction Racing</div>')
-            with c_rx2:
-                render_html('<div class="sr-jurado-sub-pts">110 pts</div>')
-            with c_rx3:
-                render_html(f'<div class="sr-jurado-sub-val">{rr_pts:.1f}</div>')
-
-            # TOTAL Row (Gold & Pink accent)
+            # Racing & TOTAL Row (Single self-contained HTML Grid block so rows never collapse)
             live_non_racing_sum = sum(new_subcat_inputs.values())
             live_grand_total = round(live_non_racing_sum + racing_subtotal, 1)
 
             render_html(f"""
-            <div class="sr-jurado-total-head">
-                <div style="display:flex; align-items:baseline; gap:10px;">
-                    <span style="font-size: 13.5px; font-weight: 900; font-style: italic; color: #FFFFFF;">TOTAL COMPETENCIA</span>
-                    <span style="font-size: 11px; color: #A0A0B5;">(Jueces: {live_non_racing_sum:.0f} pts | Carrera: {racing_subtotal:.1f} pts)</span>
+            <div style="border-top: 1px solid rgba(255, 255, 255, 0.12); margin-top: 10px; padding-top: 8px; margin-bottom: 14px;">
+                <div style="display: grid; grid-template-columns: 5.8fr 2.0fr 2.2fr; gap: 8px; align-items: center; min-height: 28px; margin-bottom: 4px;">
+                    <div class="sr-jurado-racing-head">
+                        <span class="sr-jurado-cat-name" style="color: #009FE3;">Racing</span>
+                    </div>
+                    <div class="sr-jurado-cat-pts" style="color: #009FE3;">220 pts</div>
+                    <div class="sr-jurado-sub-val" style="color: #009FE3; font-weight: 900; font-size: 12.5px;">{racing_subtotal:.1f} pts</div>
                 </div>
-                <div style="font-size: 18px; font-weight: 900; color: #FCBC00;">
-                    {live_grand_total:.1f} <span style="font-size: 12px; color: #E0E0E0;">/ 990 pts</span>
+                <div style="display: grid; grid-template-columns: 5.8fr 2.0fr 2.2fr; gap: 8px; align-items: center; min-height: 24px; margin-bottom: 2px;">
+                    <div class="sr-jurado-sub-label">Time Trials</div>
+                    <div class="sr-jurado-sub-pts">110 pts</div>
+                    <div class="sr-jurado-sub-val">{tt_pts:.1f}</div>
+                </div>
+                <div style="display: grid; grid-template-columns: 5.8fr 2.0fr 2.2fr; gap: 8px; align-items: center; min-height: 24px; margin-bottom: 8px;">
+                    <div class="sr-jurado-sub-label">Reaction Racing</div>
+                    <div class="sr-jurado-sub-pts">110 pts</div>
+                    <div class="sr-jurado-sub-val">{rr_pts:.1f}</div>
+                </div>
+                <div class="sr-jurado-total-head" style="margin-top: 6px; padding: 10px 6px 6px 6px;">
+                    <div style="display:flex; align-items:baseline; gap:10px;">
+                        <span style="font-size: 14px; font-weight: 900; font-style: italic; color: #FFFFFF;">TOTAL COMPETENCIA</span>
+                        <span style="font-size: 11.5px; color: #A0A0B5;">(Jueces: {live_non_racing_sum:.0f} pts | Carrera: {racing_subtotal:.1f} pts)</span>
+                    </div>
+                    <div style="font-size: 19px; font-weight: 900; color: #FCBC00;">
+                        {live_grand_total:.1f} <span style="font-size: 12px; color: #E0E0E0;">/ 990 pts</span>
+                    </div>
                 </div>
             </div>
             """)
 
-        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
 
         # Action Buttons right below the cuadro
         def save_team_scores(team_name: str, subcats_dict: dict):
