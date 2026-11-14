@@ -121,6 +121,29 @@ def team_badge(team_name: str, height: int = 28, gap: int = 9) -> str:
     return styles.render_team_with_logo(team_name, team_logos_b64, height=height, gap=gap)
 
 
+def team_badge_with_school(team_name: str, height: int = 36, gap: int = 10, school_font_size: int = 12) -> str:
+    """Render team logo + team name with the school name as a subtitle directly under the team name."""
+    t_str = str(team_name).strip()
+    school = dp.TEAM_TO_SCHOOL_MAP.get(t_str, "")
+    if podium_logos_b64 and t_str in podium_logos_b64:
+        icon = styles.get_podium_logo_html(t_str, podium_logos_b64, height=height)
+    else:
+        icon = styles.get_team_logo_html(t_str, team_logos_b64, height=height)
+    school_html = (
+        f'<span style="font-size: {school_font_size}px; font-weight: 600; color: #A09EB8; line-height: 1.25; margin-top: 2px; text-transform: none; letter-spacing: normal;">{school}</span>'
+        if school else ""
+    )
+    return (
+        f'<span style="display:inline-flex; align-items:center; gap:{gap}px; vertical-align:middle; text-align:left;">'
+        f'{icon}'
+        f'<span style="display:inline-flex; flex-direction:column; align-items:flex-start; line-height:1.15;">'
+        f'<span>{t_str}</span>'
+        f'{school_html}'
+        f'</span>'
+        f'</span>'
+    )
+
+
 def team_logo_only(team_name: str, height: int = 34, fallback_emoji: str = "🏎️") -> str:
     """Render only the rounded podium team logo (or fallback emoji if team has no logo)."""
     if podium_logos_b64 and str(team_name).strip() in podium_logos_b64:
@@ -2083,16 +2106,16 @@ else:
         if is_solo_h2h:
             render_html(f"""
             <div class="sr-h2h-vs-banner">
-                <span style="font-size: 24px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=36, gap=10)}</span>
+                <span style="font-size: 24px; font-weight: 900; color: #00F0FF;">{team_badge_with_school(team_a, height=38, gap=10, school_font_size=13)}</span>
                 <span style="font-size: 13px; font-weight: 800; color: #FCBC00; background: rgba(252, 188, 0, 0.14); border: 1px solid rgba(252, 188, 0, 0.45); padding: 5px 12px; border-radius: 20px; letter-spacing: 1px;">🏁 CARRERA INDIVIDUAL</span>
             </div>
             """)
         else:
             render_html(f"""
             <div class="sr-h2h-vs-banner">
-                <span style="font-size: 24px; font-weight: 900; color: #00F0FF;">{team_badge(team_a, height=36, gap=10)}</span>
+                <span style="font-size: 24px; font-weight: 900; color: #00F0FF;">{team_badge_with_school(team_a, height=38, gap=10, school_font_size=13)}</span>
                 <span style="font-size: 20px; font-weight: 900; color: #FF2A85; margin: 0 6px;">VS</span>
-                <span style="font-size: 24px; font-weight: 900; color: #FF8A00;">{team_badge(team_b, height=36, gap=10)}</span>
+                <span style="font-size: 24px; font-weight: 900; color: #FF8A00;">{team_badge_with_school(team_b, height=38, gap=10, school_font_size=13)}</span>
             </div>
             """)
 
@@ -2184,7 +2207,7 @@ else:
                     <tr>
                         <th rowspan="2" style="vertical-align: middle; width: 22%; padding: 14px 16px;">Carrera</th>
                         <th colspan="3" style="text-align: center; background: rgba(0, 240, 255, 0.15); color: #00F0FF; padding: 12px; font-size: 16px;">
-                            {team_badge(team_a, height=28)}
+                            {team_badge_with_school(team_a, height=28, gap=8, school_font_size=11)}
                         </th>
                     </tr>
                     <tr>
@@ -2223,7 +2246,7 @@ else:
             <div style="max-width: 540px; margin: 0 auto 8px auto;">
                 <div class="sr-h2h-card" style="border: 1px solid rgba(0, 240, 255, 0.4);">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                        <span style="font-size: 16px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=26)}</span>
+                        <span style="font-size: 16px; font-weight: 900; color: #009FE3;">{team_badge_with_school(team_a, height=26, gap=8, school_font_size=11)}</span>
                         <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos (Individual)</span>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
@@ -2272,10 +2295,10 @@ else:
                     <tr>
                         <th rowspan="2" style="vertical-align: middle; width: 14%; padding: 14px 16px;">Carrera</th>
                         <th colspan="3" style="text-align: center; border-right: 2px solid rgba(255, 42, 133, 0.5); background: rgba(0, 240, 255, 0.15); color: #00F0FF; padding: 12px; font-size: 16px;">
-                            {team_badge(team_a, height=28)}
+                            {team_badge_with_school(team_a, height=28, gap=8, school_font_size=11)}
                         </th>
                         <th colspan="3" style="text-align: center; background: rgba(255, 138, 0, 0.15); color: #FF8A00; padding: 12px; font-size: 16px;">
-                            {team_badge(team_b, height=28)}
+                            {team_badge_with_school(team_b, height=28, gap=8, school_font_size=11)}
                         </th>
                     </tr>
                     <tr>
@@ -2327,7 +2350,7 @@ else:
             <div class="sr-h2h-cards-grid">
                 <div class="sr-h2h-card" style="border: 1px solid rgba(0, 240, 255, 0.4);">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                        <span style="font-size: 16px; font-weight: 900; color: #009FE3;">{team_badge(team_a, height=26)}</span>
+                        <span style="font-size: 16px; font-weight: 900; color: #009FE3;">{team_badge_with_school(team_a, height=26, gap=8, school_font_size=11)}</span>
                         <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
@@ -2347,7 +2370,7 @@ else:
                 </div>
                 <div class="sr-h2h-card" style="border: 1px solid rgba(237, 109, 5, 0.4);">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                        <span style="font-size: 16px; font-weight: 900; color: #ED6D05;">{team_badge(team_b, height=26)}</span>
+                        <span style="font-size: 16px; font-weight: 900; color: #ED6D05;">{team_badge_with_school(team_b, height=26, gap=8, school_font_size=11)}</span>
                         <span style="font-size: 11px; font-weight: 800; color: #A09EB8; text-transform: uppercase; letter-spacing: 1px;">Mejores Tiempos</span>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
