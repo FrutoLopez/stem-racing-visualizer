@@ -9,6 +9,8 @@ Fully adheres to official STEM Racing / F1 in Schools regulations:
 
 import os
 import base64
+import inspect
+import functools
 from datetime import datetime
 import streamlit as st
 import streamlit.components.v1 as components
@@ -17,6 +19,24 @@ import numpy as np
 
 import data_processor as dp
 import styles
+
+# Compatibility shim for Streamlit <= 1.40 (which uses Webpack/Babel for iPadOS 16 Safari compatibility
+# and expects use_container_width=True instead of width='stretch')
+if "width" not in inspect.signature(st.button).parameters:
+    def _compat_width_wrapper(fn):
+        @functools.wraps(fn)
+        def _wrapped(*args, **kwargs):
+            if kwargs.get("width") == "stretch":
+                kwargs.pop("width", None)
+                kwargs["use_container_width"] = True
+            elif "width" in kwargs and isinstance(kwargs["width"], str):
+                kwargs.pop("width", None)
+            return fn(*args, **kwargs)
+        return _wrapped
+
+    for _fn_name in ("button", "download_button", "dataframe", "data_editor"):
+        if hasattr(st, _fn_name):
+            setattr(st, _fn_name, _compat_width_wrapper(getattr(st, _fn_name)))
 
 # Page Configuration
 st.set_page_config(
