@@ -31,10 +31,7 @@ def render_html(html_str: str):
     """Safely render raw HTML without markdown treating indented lines as code blocks."""
     clean_lines = [line.strip() for line in html_str.splitlines() if line.strip()]
     clean_html = "\n".join(clean_lines)
-    if hasattr(st, "html"):
-        st.html(clean_html)
-    else:
-        st.markdown(clean_html, unsafe_allow_html=True)
+    st.markdown(clean_html, unsafe_allow_html=True)
 
 
 def format_pts(val: float) -> str:
@@ -71,13 +68,15 @@ def _compute_branding_cache_key() -> tuple:
 
 
 def _load_transparent_xl_logo_b64(path: str) -> str:
-    """Load the XL JPEG logo, key out its black background to transparent PNG, crop tight, and return base64."""
+    """Load the XL JPEG logo, downscale, key out its black background to transparent PNG, crop tight, and return base64."""
     if not os.path.exists(path):
         return ""
     try:
         import io
         from PIL import Image
-        img = Image.open(path).convert("RGBA")
+        with Image.open(path) as raw_img:
+            img = raw_img.convert("RGBA")
+            img.thumbnail((720, 320), Image.Resampling.LANCZOS)
         arr = np.array(img, dtype=np.uint8)
         max_rgb = arr[:, :, :3].max(axis=2).astype(np.float32)
         # Smoothly key out near-black background (<=16 -> 0, >=36 -> 255)
@@ -88,7 +87,7 @@ def _load_transparent_xl_logo_b64(path: str) -> str:
         if bbox:
             out = out.crop(bbox)
         buf = io.BytesIO()
-        out.save(buf, format="PNG")
+        out.save(buf, format="PNG", optimize=True)
         return base64.b64encode(buf.getvalue()).decode()
     except Exception:
         return ""
@@ -111,10 +110,7 @@ def load_cached_branding_and_teams(cache_key: tuple):
 custom_css_str, logo_b64, xl_logo_b64, mono_white_logo_b64, team_logos_b64, podium_logos_b64, official_teams, matchups_list = load_cached_branding_and_teams(_compute_branding_cache_key())
 
 # Inject Custom CSS
-if hasattr(st, "html"):
-    st.html(custom_css_str)
-else:
-    st.markdown(custom_css_str, unsafe_allow_html=True)
+st.markdown(custom_css_str, unsafe_allow_html=True)
 
 
 def team_badge(team_name: str, height: int = 28, gap: int = 9) -> str:
@@ -340,9 +336,9 @@ def save_and_sync_judge_scores(scores_df: pd.DataFrame, racing_pts_map: dict) ->
         return updated
 
 
-@st.fragment(run_every=2.5)
+@st.fragment(run_every=5.0)
 def live_visualizer_sync_watcher():
-    """Background watcher that refreshes passive visualizer tabs when records are saved."""
+    """Background watcher that refreshes passive visualizer tabs when records are saved on another device."""
     store = get_shared_race_store()
     sync_store_from_disk_if_needed(store)
     if st.session_state.get("local_store_version", -1) != store["version"]:
@@ -442,6 +438,13 @@ with st.sidebar:
         index=screen_options.index(cur_mode),
         key="app_view_mode",
         label_visibility="collapsed"
+    )
+
+    enable_bg_sync = st.toggle(
+        "🔄 Auto-Sincronizar (Multi-Dispositivo)",
+        value=False,
+        key="enable_bg_sync_toggle",
+        help="Actívalo solo en la pantalla proyectada cuando registres datos desde otro dispositivo (ej. celular). Mantenerlo apagado evita sobrecargar el navegador y el controlador gráfico."
     )
 
     st.markdown("---")
@@ -1592,7 +1595,8 @@ elif selected_view == "🏆 Ceremonia de Podio":
     # Sin encabezado superior, sin pestañas, sin indicador de pasos.
     # Máximo espacio y protagonismo para la ceremonia.
     # -------------------------------------------------------------------------
-    live_visualizer_sync_watcher()
+    if enable_bg_sync:
+        live_visualizer_sync_watcher()
     curr_step = int(st.session_state.podium_slide_step)
 
     # Render Current Ceremony Slide (0: Intro -> 1: Logo Splash -> 2: Pop 3ro -> 3: Pop 2do -> 4: Pop 1ro)
@@ -1686,7 +1690,6 @@ elif selected_view == "📝 Registro de Jurado":
     # -------------------------------------------------------------------------
     # PANTALLA: REGISTRO DE JURADO (HOJA DE EVALUACIÓN POR EQUIPO)
     # -------------------------------------------------------------------------
-    live_visualizer_sync_watcher()
 
     # Team selector state initialization
     if "judging_summary_team_idx" not in st.session_state:
@@ -1974,7 +1977,8 @@ else:
     # -------------------------------------------------------------------------
     # PANTALLA DE TIEMPOS Y RESULTADOS EN PISTA (4 TABS)
     # -------------------------------------------------------------------------
-    live_visualizer_sync_watcher()
+    if enable_bg_sync:
+        live_visualizer_sync_watcher()
     render_html('<div class="sr-results-screen"></div>' + styles.render_app_header(logo_b64))
 
     tab1, tab2, tab3, tab4 = st.tabs([

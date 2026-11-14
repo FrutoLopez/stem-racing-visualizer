@@ -94,7 +94,6 @@ h1, h2, h3, .sr-header-title, .sr-heading {
     padding: 18px 28px;
     margin-bottom: 24px;
     box-shadow: 0 8px 32px rgba(5, 0, 11, 0.6);
-    backdrop-filter: blur(12px);
     position: relative;
     overflow: hidden;
 }
@@ -516,17 +515,14 @@ input:disabled, .stTextInput input:disabled, div[data-baseweb="input"] input:dis
     0% {
         opacity: 0;
         transform: scale(0.86) translateY(24px);
-        filter: blur(4px);
     }
     65% {
         opacity: 1;
         transform: scale(1.03) translateY(-3px);
-        filter: blur(0);
     }
     100% {
         opacity: 1;
         transform: scale(1) translateY(0);
-        filter: blur(0);
     }
 }
 
@@ -796,13 +792,12 @@ div[data-testid="stMainBlockContainer"]:has(.sr-editor-mobile) .stCheckbox label
    OFFICIAL STEM RACING - JUDGING BREAKDOWN SCORECARD STYLES
    ========================================================================== */
 .sr-judging-panel {
-    background: rgba(18, 14, 28, 0.92);
+    background: rgba(18, 14, 28, 0.96);
     border: 1px solid rgba(230, 0, 126, 0.35);
     border-radius: 16px;
     padding: 22px 26px;
     margin-bottom: 24px;
     box-shadow: 0 10px 36px rgba(5, 0, 11, 0.7);
-    backdrop-filter: blur(14px);
     position: relative;
     overflow: hidden;
 }

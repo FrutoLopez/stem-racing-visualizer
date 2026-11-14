@@ -1616,7 +1616,6 @@ def parse_judging_rubric_files(
                     ws = wb[sheet_name]
                     sheet_rows = [[cell.value for cell in r] for r in ws.iter_rows()]
                     all_rows.extend(sheet_rows)
-                    # Also try tabular parse on individual sheet if breakdown isn't matched
                 file_extracted = _parse_breakdown_grid_rows(all_rows, fname, official_teams)
                 if not file_extracted:
                     df_excel = pd.read_excel(BytesIO(raw_bytes))
